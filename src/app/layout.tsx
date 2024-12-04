@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import ClientWalletProvider from './providers/WalletProvider'
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
