@@ -41,7 +41,11 @@ export async function POST(req: Request) {
     // Get the messages
     const messages = await openai.beta.threads.messages.list(thread.id);
     const lastMessage = messages.data[0];
-    const reply = lastMessage.content[0].text.value;
+    let reply = "No response received";
+    
+    if (lastMessage.content[0] && 'text' in lastMessage.content[0]) {
+      reply = lastMessage.content[0].text.value;
+    }
 
     return NextResponse.json({ reply });
   } catch (error) {
