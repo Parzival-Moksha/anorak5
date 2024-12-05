@@ -1,11 +1,10 @@
 'use client';
-import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import confetti from 'canvas-confetti';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useState, useEffect, useRef } from 'react';
 import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
-import { useConnection } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 
 interface Message {
   id: number;
@@ -15,13 +14,15 @@ interface Message {
 }
 
 export default function Home() {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const [timeRemaining, setTimeRemaining] = useState(3600); // 1 hour in seconds
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [detectedTrigger, setDetectedTrigger] = useState<boolean>(false);
+  const [transactionState, setTransactionState] = useState<'idle' | 'signing' | 'processing' | 'confirmed' | 'error'>('idle');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { connection } = useConnection();
+  const [canSendMessage, setCanSendMessage] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -196,31 +197,39 @@ export default function Home() {
       angle: randomInRange(55, 125)
     });
   };
-  const sendSol = async () => {
-    if (!publicKey) {
-      alert('Please connect your wallet first!');
-      return;
-    }
+const sendSol = async () => {
+  if (!publicKey) {
+    alert('Please connect your wallet first!');
+    return;
+  }
+  
+  try {
+    setTransactionState('signing');
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: publicKey,
+        // Replace this with your actual wallet address where you want to receive the SOL
+        toPubkey: new PublicKey('E1j44YFzdtmMG2mjm1DFBJJKkVx7Y1Krk1WJs8pdhk9e'),
+        lamports: LAMPORTS_PER_SOL * 0.1,
+      })
+    );
     
-    try {
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey('E1j44YFzdtmMG2mjm1DFBJJKkVx7Y1Krk1WJs8pdhk9e'), // Replace this with your recipient wallet address
-          lamports: LAMPORTS_PER_SOL * 0.1, // Sending 0.1 SOL
-        })
-      );
-      
-      const signature = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(signature, 'confirmed');
-      
-      fireSchoolPride(); // Use existing animation
-      console.log('Payment successful!');
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Payment failed! Check console for details.');
-    }
-  };
+    // Will wait for user to approve in wallet
+    const signature = await sendTransaction(transaction, connection);
+    setTransactionState('processing');
+    console.log('Transaction sent:', signature);
+    
+    // Wait for confirmation
+    await connection.confirmTransaction(signature, 'confirmed');
+    setTransactionState('confirmed');
+    setCanSendMessage(true);
+    console.log('Transaction confirmed!');
+    
+  } catch (error) {
+    console.error('Error:', error);
+    setTransactionState('error');
+  }
+};
   function randomInRange(min: number, max: number) {
     return Math.random() * (max - min) + min;
   }
@@ -259,23 +268,36 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
+       {/* Input Area */}
         <form onSubmit={handleSend} className="p-4 border-t border-white/10">
           <div className="flex gap-2">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              className="flex-1 bg-white/10 rounded-lg px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Type your message..."
+              className={`flex-1 bg-white/10 rounded-lg px-4 py-2 text-white placeholder-white/50 
+                focus:outline-none focus:ring-2 focus:ring-purple-500
+                ${!canSendMessage ? 'opacity-50 cursor-not-allowed' : ''}`}  // Added opacity and cursor styles for disabled state
+              placeholder={canSendMessage ? "Type your message..." : "Pay 0.1 SOL to unlock messaging..."} // Changed placeholder to indicate payment requirement
+              disabled={!canSendMessage}  // Disable input if payment not made
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-purple-500 rounded-lg text-white hover:bg-purple-600 transition-colors"
+              className={`px-4 py-2 bg-purple-500 rounded-lg text-white transition-colors
+                ${canSendMessage 
+                  ? 'hover:bg-purple-600' 
+                  : 'opacity-50 cursor-not-allowed bg-purple-400'}`}  // Modified styles for disabled state
+              disabled={!canSendMessage}  // Disable button if payment not made
             >
               Send
             </button>
           </div>
+          {/* Added status message */}
+          {!canSendMessage && (
+            <div className="text-sm text-white/50 mt-2">
+              Send 0.1 SOL to unlock messaging functionality
+            </div>
+          )}
         </form>
       </div>
 
@@ -363,6 +385,13 @@ export default function Home() {
         >
           <span className="relative z-10">I Sent a Message</span>
           <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-orange-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+		  <div className="mt-4 text-sm">
+  {transactionState === 'idle' && 'Ready to pay'}
+  {transactionState === 'signing' && 'Please sign the transaction in your wallet...'}
+  {transactionState === 'processing' && 'Processing transaction...'}
+  {transactionState === 'confirmed' && 'Payment confirmed! You can now send a message.'}
+  {transactionState === 'error' && 'Transaction failed. Please try again.'}
+</div>
         </button>
       </div>
     </div>
