@@ -344,7 +344,7 @@ export default function Home() {
             sendSol();
           }}
         >
-          <span className="relative z-10">I'm paying</span>
+          <span className="relative z-10">im paying</span>
           <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
         </button>
         
