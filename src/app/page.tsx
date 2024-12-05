@@ -4,6 +4,8 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import confetti from 'canvas-confetti';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useState, useEffect, useRef } from 'react';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { useConnection } from '@solana/wallet-adapter-react';
 
 interface Message {
   id: number;
@@ -19,6 +21,7 @@ export default function Home() {
   const [inputValue, setInputValue] = useState('');
   const [detectedTrigger, setDetectedTrigger] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { connection } = useConnection();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -193,7 +196,31 @@ export default function Home() {
       angle: randomInRange(55, 125)
     });
   };
-
+  const sendSol = async () => {
+    if (!publicKey) {
+      alert('Please connect your wallet first!');
+      return;
+    }
+    
+    try {
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey('E1j44YFzdtmMG2mjm1DFBJJKkVx7Y1Krk1WJs8pdhk9e'), // Replace this with your recipient wallet address
+          lamports: LAMPORTS_PER_SOL * 0.1, // Sending 0.1 SOL
+        })
+      );
+      
+      const signature = await sendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+      
+      fireSchoolPride(); // Use existing animation
+      console.log('Payment successful!');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Payment failed! Check console for details.');
+    }
+  };
   function randomInRange(min: number, max: number) {
     return Math.random() * (max - min) + min;
   }
@@ -313,11 +340,11 @@ export default function Home() {
             border border-white/10 shadow-inner
             relative overflow-hidden group"
           onClick={() => {
-            console.log("I Paid clicked");
-            fireSchoolPride();
+            console.log("Payment initiated");
+            sendSol();
           }}
         >
-          <span className="relative z-10">I Paid</span>
+          <span className="relative z-10">I'm paying</span>
           <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
         </button>
         
