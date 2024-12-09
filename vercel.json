@@ -1,0 +1,15 @@
+{
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./solstuff/",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "ignoreFiles": [
+    "solstuff/**/*"
+  ]
+}
