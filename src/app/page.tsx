@@ -4,13 +4,10 @@ import confetti from 'canvas-confetti';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, TransactionInstruction, } from '@solana/web3.js';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet, Wallet } from '@solana/wallet-adapter-react';
 import * as anchor from "@project-serum/anchor";
 
-// Constants
-const SECONDS_IN_HOUR = 3600;
-
-const getProvider = (connection, wallet) => {
+const getProvider = (connection: Connection, wallet: any) => {
     const provider = new anchor.AnchorProvider(
         connection,
         wallet,
@@ -19,6 +16,9 @@ const getProvider = (connection, wallet) => {
     anchor.setProvider(provider);
     return provider;
 };
+
+// Constants
+const SECONDS_IN_HOUR = 3600;
 
 const IDL = {
     "version": "0.1.0",
