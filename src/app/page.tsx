@@ -20,6 +20,10 @@ const getProvider = (connection: Connection, wallet: any) => {
 // Constants
 const SECONDS_IN_HOUR = 3600;
 
+function randomInRange(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+}
+
 const IDL = {
     "version": "0.1.0",
     "name": "hello_anchor",
