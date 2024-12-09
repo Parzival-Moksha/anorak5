@@ -38,3 +38,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Solana/Anchor specific
+.anchor
+**/target/
+**/*.rs.bk
+**/test-ledger/
+**/*.keypair.json
+**/id.json
+**/node_modules/
+**/.anchor/
+**/dist/
+**/build/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+
+# Backup folders
+**/backup*/

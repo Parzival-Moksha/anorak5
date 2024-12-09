@@ -1,0 +1,42 @@
+# Anchor/Solana Build Output
+target/
+**/*.rs.bk
+.anchor/
+dist/
+test-ledger/
+build/
+
+# Key Files & Sensitive Data
+*.keypair.json
+id.json
+*-keypair.json
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Debug Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+
+# Test Coverage
+coverage/
+
+# Temporary files
+*.log
+*.temp
+temp/
