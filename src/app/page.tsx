@@ -510,15 +510,15 @@ console.log("Provider created");
         console.error('Detailed error:', error);
         // Log the full error object
         console.log("Full error object:", {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-            logs: error.logs,
+            name: error instanceof Error ? error.name : 'Unknown error',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            logs: (error as any).logs || undefined,
             details: error
         });
         setTransactionStatus({ 
             state: 'error', 
-            message: error.message || 'Transaction failed!' 
+            message: error instanceof Error ? error.message : 'Transaction failed!' 
         });
     }
 };
