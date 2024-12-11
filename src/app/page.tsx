@@ -243,7 +243,7 @@ const TransactionMonitor: React.FC<TransactionMonitorProps> = ({
     >
       <div className="text-center">
         {detectedTrigger ? (
-          <div className="text-green-400">You won Sooka's heart</div>
+          <div className="text-green-400">You won the heart of Sooka</div>
         ) : (
           <div className="text-white/30">Secret unclaimed</div>
         )}
