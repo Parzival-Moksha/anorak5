@@ -7,6 +7,9 @@ import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, Tr
 import { useConnection, useWallet, Wallet } from '@solana/wallet-adapter-react';
 import * as anchor from "@project-serum/anchor";
 
+const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
+const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
+
 const getProvider = (connection: Connection, wallet: any) => {
     const provider = new anchor.AnchorProvider(
         connection,
@@ -33,6 +36,27 @@ const IDL = {
             "accounts": [
                 {
                     "name": "user",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "programWallet",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "withdrawToWinner",
+            "accounts": [
+                {
+                    "name": "winner",
                     "isMut": true,
                     "isSigner": true
                 },
@@ -219,9 +243,7 @@ const TransactionMonitor: React.FC<TransactionMonitorProps> = ({
     >
       <div className="text-center">
         {detectedTrigger ? (
-          <div className="text-green-400">
-            SUCCESS! SOOKA AND HER SECRET IS YOURS!
-          </div>
+          <div className="text-green-400">You won Sooka's heart</div>
         ) : (
           <div className="text-white/30">Secret unclaimed</div>
         )}
@@ -340,6 +362,25 @@ export default function Home() {
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { connection } = useConnection();
+  const [prizePool, setPrizePool] = useState<number>(0);
+  const fetchPrizePool = async () => {
+    try {
+        const [programWallet] = PublicKey.findProgramAddressSync(
+            [Buffer.from("program_wallet")],
+            new PublicKey(PROGRAM_ID)
+        );
+        const balance = await connection?.getBalance(programWallet);
+        setPrizePool(balance ? balance / LAMPORTS_PER_SOL : 0);
+    } catch (error) {
+        console.error("Error fetching prize pool:", error);
+        setPrizePool(0);
+    }
+};
+  useEffect(() => {
+    fetchPrizePool();
+    const interval = setInterval(fetchPrizePool, 10000); // Update every 10 seconds
+    return () => clearInterval(interval);
+}, [connection]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -349,11 +390,51 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  const scanForTriggers = useCallback((message: string) => {
-    if (message.toLowerCase().includes('you fucked sooka')) {
-      setDetectedTrigger(true);
+  const scanForTriggers = useCallback(async (message: string) => {
+    if (message.toLowerCase().includes('you seduced me') && publicKey) {
+        setDetectedTrigger(true);
+        
+        try {
+            // Get the provider and program setup
+            const provider = getProvider(connection, window.solana);
+            const programId = new PublicKey(PROGRAM_ID);
+            const program = new anchor.Program(IDL, programId, provider);
+            
+            // Get PDA
+            const [programWallet, bump] = PublicKey.findProgramAddressSync(
+                [Buffer.from("program_wallet")],
+                programId
+            );
+            
+            // Call withdraw function with PDA as signer
+            const tx = await program.methods
+                .withdrawToWinner()
+                .accounts({
+                    winner: publicKey,
+                    programWallet: programWallet,
+                    systemProgram: SystemProgram.programId,
+                })
+                .signers([]) // No additional signers needed as PDA is the authority
+                .rpc();
+            
+            console.log("Prize automatically sent! Transaction:", tx);
+            setTransactionStatus({ 
+                state: 'confirmed', 
+                message: 'Congratulations! Prize has been automatically sent to your wallet!' 
+            });
+            
+            // Update prize pool after successful transfer
+            fetchPrizePool();
+            
+        } catch (error) {
+            console.error("Failed to send prize:", error);
+            setTransactionStatus({ 
+                state: 'error', 
+                message: 'Failed to send prize automatically. Please contact support.' 
+            });
+        }
     }
-  }, []);
+}, [connection, publicKey, fetchPrizePool]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -478,7 +559,7 @@ const sendSol = async () => {
 const provider = getProvider(connection, window.solana);
 console.log("Provider created");
 
-        const programId = new PublicKey('BqNzK3t72vrMpUZGLPbjUCdSMiz6hWKU1emAQL5Gcrfk');
+        const programId = new PublicKey(PROGRAM_ID);
         console.log("Program ID:", programId.toString());
 
         // Create program interface
@@ -523,7 +604,7 @@ console.log("Provider created");
     }
 };
 
-  return (
+return (
     <div className="min-h-screen p-4 bg-background">
       <div className="absolute top-4 right-4">
         <WalletMultiButton />
@@ -551,7 +632,13 @@ console.log("Provider created");
           transactionStatus={transactionStatus}
         />
         <div className="bg-black/20 p-5 rounded-xl backdrop-blur-sm shadow-lg">
-          <TimerDisplay timeRemaining={timeRemaining} />
+          <div className="text-center mb-2">
+            <div className="text-2xl font-bold text-white mb-2">
+              Prize Pool: {prizePool.toFixed(2)} SOL
+            </div>
+            <TimerDisplay timeRemaining={timeRemaining} />
+          </div>
+          
           <ButtonSet
             resetTimer={resetTimer}
             fireFireworks={fireFireworks}
