@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Connection, Keypair, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import * as anchor from "@project-serum/anchor";
+import { appendMessage, getRecentMessages } from '@/app/utils/messageStorage';
 
 // In-memory store for wallet-message pairs
 interface MessageRecord {
@@ -222,6 +223,11 @@ Response: ${record.response}
   }
 }
 
+export async function GET() {
+  const messages = await getRecentMessages();
+  return Response.json({ messages });
+}
+
 export async function POST(req: Request) {
   try {
     const { message, walletAddress } = await req.json();
@@ -294,6 +300,14 @@ export async function POST(req: Request) {
         }
     }
     
+    // Store the message
+    await appendMessage({
+      timestamp: new Date().toISOString(),
+      walletAddress,
+      query: message,
+      response: reply,
+    });
+
     return NextResponse.json({
         reply,
         isWinner,

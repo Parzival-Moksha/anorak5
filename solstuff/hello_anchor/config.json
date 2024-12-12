@@ -1,0 +1,9 @@
+{
+  "smartContractAddress": "<smart-contract-address>",
+  "authorityPublicKey": "<authority-public-key>",
+  "adminPublicKey": "<admin-public-key>",
+  "prizeDistributorPublicKey": "<prize-distributor-public-key>",
+  "lamportsToPayAmount": 0.02,
+  "network": "devnet",
+  "programName": "sooka1"
+} 

@@ -89,6 +89,7 @@ interface Message {
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
+  walletAddress?: string;
 }
 
 type ChatState = 'idle' | 'paid' | 'questionAsked';
@@ -132,6 +133,30 @@ interface MessageProps {
   message: Message;
 }
 
+const generateUserAvatar = (walletAddress: string) => {
+  // Create a deterministic seed from wallet address
+  const seed = walletAddress.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  
+  // Generate pastel colors based on wallet address
+  const getColor = (index: number) => {
+    const hue = (seed + index * 137) % 360;  // Golden angle progression
+    return `hsl(${hue}, 65%, 85%)`; // Pastel colors
+  };
+
+  // Create an 8x8 grid of divs with unique colors
+  return (
+    <div className="w-full h-full grid grid-cols-8 grid-rows-8">
+      {Array.from({ length: 64 }).map((_, i) => (
+        <div
+          key={i}
+          style={{ backgroundColor: getColor(i) }}
+          className="w-full h-full"
+        />
+      ))}
+    </div>
+  );
+};
+
 const MessageBubble: React.FC<MessageProps> = ({ message }) => {
   return (
     <div
@@ -142,12 +167,41 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
           message.sender === 'user'
             ? 'bg-purple-500/50 ml-auto'
             : 'bg-white/10'
-        }`}
+        } flex items-start gap-3`}
       >
-        <p className="text-white">{message.content}</p>
-        <p className="text-xs text-white/50 mt-1">
-          {message.timestamp.toLocaleTimeString()}
-        </p>
+        {/* Avatar Circle */}
+        <div className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden">
+          {message.sender === 'ai' ? (
+            <img 
+              src="/sookaprofile2.jpg"
+              alt="Sooka"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            // Generated pixelated avatar for user
+            message.walletAddress ? (
+              <div className="w-full h-full">
+                {generateUserAvatar(message.walletAddress)}
+              </div>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-500 rounded-full" />
+            )
+          )}
+        </div>
+
+        <div className="flex-1">
+          <p className="text-white">{message.content}</p>
+          <div className="flex justify-between items-center mt-1">
+            <p className="text-[10px] text-white/50">
+              {message.sender === 'user' && message.walletAddress 
+                ? `${message.walletAddress.slice(0, 4)}...${message.walletAddress.slice(-4)}`
+                : 'Sooka AI'}
+            </p>
+            <p className="text-[10px] text-white/50">
+              {message.timestamp.toLocaleTimeString()}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -199,7 +253,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             ${chatState !== 'paid' ? 'opacity-50 cursor-not-allowed' : ''}`}
           placeholder={
             chatState === 'idle'
-              ? "Pay 0.1 SOL to unlock messaging..."
+              ? "pay first"
               : chatState === 'questionAsked'
               ? "You have already asked a question. Pay again to ask another."
               : "Type your message..."
@@ -220,7 +274,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       {/* Status messages */}
       {showUnlockMessage && (
         <div className="text-sm text-white/50 mt-2">
-          Send 0.1 SOL to unlock messaging functionality
+          connect your wallet and click im paying
         </div>
       )}
       {showResendMessage && (
@@ -281,30 +335,408 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ timeRemaining }) => {
 // Button Set Component
 interface ButtonSetProps {
   sendSol: () => Promise<void>;
+  enableFreeMode: () => void;
   transactionStatus: TransactionStatus;
 }
 
 const ButtonSet: React.FC<ButtonSetProps> = ({
   sendSol,
+  enableFreeMode,
   transactionStatus,
 }) => {
   return (
+    <div className="flex flex-col gap-3">
+      <button 
+        className="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-lg
+          transform transition-all duration-200 ease-in-out
+          hover:scale-105 hover:shadow-lg hover:from-rose-600 hover:to-pink-700
+          active:scale-95 active:shadow-inner
+          min-w-[170px] text-sm font-semibold
+          border border-white/10 shadow-inner
+          relative overflow-hidden group"
+        onClick={() => {
+          console.log("Payment initiated");
+          sendSol();
+        }}
+      >
+        <span className="relative z-10">im paying</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      </button>
+
+      <button 
+        className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white/80 rounded-lg
+          transform transition-all duration-200 ease-in-out
+          hover:scale-105 hover:shadow-lg hover:from-gray-700 hover:to-gray-800
+          active:scale-95 active:shadow-inner
+          min-w-[170px] text-sm font-semibold
+          border border-white/10 shadow-inner
+          relative overflow-hidden group"
+        onClick={enableFreeMode}
+      >
+        <span className="relative z-10">i aint paying</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-700 to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      </button>
+    </div>
+  );
+};
+
+// Add this interface and component before the SideButtons component
+interface SideButtonProps {
+  label: string;
+  icon: React.ReactNode;
+  order: number;
+  gradientFrom: string;
+  gradientTo: string;
+  onClick: () => void;
+}
+
+const SideButton: React.FC<SideButtonProps> = ({ 
+  label, 
+  icon, 
+  order, 
+  gradientFrom, 
+  gradientTo,
+  onClick
+}) => {
+  return (
     <button 
-      className="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-lg
-        transform transition-all duration-200 ease-in-out
-        hover:scale-105 hover:shadow-lg hover:from-rose-600 hover:to-pink-700
+      onClick={onClick}
+      className={`px-6 py-3 bg-gradient-to-r ${gradientFrom} ${gradientTo}
+        text-white rounded-lg transform transition-all duration-200 
+        ease-in-out hover:scale-105 hover:shadow-lg 
         active:scale-95 active:shadow-inner
-        min-w-[170px] text-sm font-semibold
+        min-w-[140px] text-lg font-semibold
         border border-white/10 shadow-inner
-        relative overflow-hidden group"
-      onClick={() => {
-        console.log("Payment initiated");
-        sendSol();
-      }}
+        relative overflow-hidden group
+        bg-opacity-80 backdrop-blur-sm`}
     >
-      <span className="relative z-10">im paying</span>
-      <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      <span className="relative z-10 flex items-center justify-center gap-2">
+        {icon}
+        {label}
+      </span>
+      <div className={`absolute inset-0 bg-gradient-to-r ${gradientFrom} ${gradientTo} opacity-0 group-hover:opacity-100 transition-opacity duration-200`}></div>
     </button>
+  );
+};
+
+// Add this new Modal component
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children?: React.ReactNode;
+}
+
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+      <div 
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      <div className="relative w-[85vw] h-[85vh] bg-black/40 rounded-xl border border-white/10 backdrop-blur-md overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b border-white/10">
+          <h2 className="text-xl font-semibold text-white">{title}</h2>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="p-6 h-[calc(85vh-80px)] overflow-y-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Create a RoadmapContent component
+const RoadmapContent: React.FC = () => {
+  return (
+    <div className="space-y-8">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-white mb-2">Sooka Development Journey</h3>
+        <p className="text-white/60">Our path to revolutionizing AI challenges</p>
+      </div>
+
+      <div className="space-y-6">
+        {[
+          {
+            emoji: "🚀",
+            title: "Initial Launch",
+            description: "Launch of the $SOOKA token and the first Sooka challenge",
+            status: "Current Phase"
+          },
+          {
+            emoji: "🎮",
+            title: "Challenge Expansion",
+            description: "Launching more challenges",
+            status: "Coming Soon"
+          },
+          {
+            emoji: "⚙️",
+            title: "Automation Implementation",
+            description: "Automating the prize distribution, buyback and burn mechanisms",
+            status: "Planned"
+          },
+          {
+            emoji: "💰",
+            title: "Payment Options",
+            description: "Introducing cheaper payment options in $SOOKA and $MOKSHA",
+            status: "Planned"
+          },
+          {
+            emoji: "🏆",
+            title: "Custom Winning Conditions",
+            description: "Introducing time limits, multiple (3-10) winners",
+            status: "Future"
+          },
+          {
+            emoji: "🚀",
+            title: "Sooka Launchpad",
+            description: "The creation of custom challenges for anyone for $SOOKA and $MOKSHA",
+            status: "Future"
+          },
+          {
+            emoji: "🎲",
+            title: "Multi-level Challenges",
+            description: "Prizes for each milestone reached in a multiplayer RPG",
+            status: "Future"
+          }
+        ].map((milestone, index) => (
+          <div 
+            key={index}
+            className="bg-white/5 rounded-lg p-6 border border-white/10 
+              transform transition-all duration-200 hover:scale-[1.02] hover:bg-white/10"
+          >
+            <div className="flex items-start gap-4">
+              <div className="text-4xl">{milestone.emoji}</div>
+              <div className="flex-1">
+                <h4 className="text-xl font-semibold text-white mb-2">{milestone.title}</h4>
+                <p className="text-white/70 mb-3">{milestone.description}</p>
+                <span className={`text-sm px-3 py-1 rounded-full ${
+                  milestone.status === 'Current Phase' 
+                    ? 'bg-green-500/20 text-green-300'
+                    : milestone.status === 'Coming Soon'
+                    ? 'bg-blue-500/20 text-blue-300'
+                    : 'bg-purple-500/20 text-purple-300'
+                }`}>
+                  {milestone.status}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Add this new component
+const SookaTokenContent: React.FC = () => {
+  return (
+    <div className="space-y-8">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-white mb-2">$SOOKA Token Utility</h3>
+        <p className="text-white/60">The native token powering the Sooka ecosystem</p>
+      </div>
+
+      <div className="space-y-6">
+        {[
+          {
+            emoji: "🎮",
+            title: "Participation Fee",
+            description: "Use $SOOKA tokens to participate in challenges",
+            highlight: "Core Utility"
+          },
+          {
+            emoji: "🚀",
+            title: "Launchpad Access",
+            description: "Pay for creating and accessing custom Launchpad challenges",
+            highlight: "Creator Feature"
+          },
+          {
+            emoji: "🔓",
+            title: "System Prompt Access",
+            description: "Unlock parts of the system prompt for deeper understanding",
+            highlight: "Advanced Feature"
+          },
+          {
+            emoji: "⚡",
+            title: "Priority Access",
+            description: "Get access to the first x number of queries",
+            highlight: "Premium Feature"
+          },
+          {
+            emoji: "🔥",
+            title: "Buy & Burn",
+            description: "10% of every prize payout goes to market buy and burn",
+            highlight: "Tokenomics"
+          },
+          {
+            emoji: "🎁",
+            title: "Community Perks",
+            description: "Exclusive access to community features and benefits",
+            highlight: "Membership"
+          },
+          {
+            emoji: "💫",
+            title: "Creator Rewards",
+            description: "Rewarding creators and active members for their contributions to the $SOOKA ecosystem",
+            highlight: "Incentives"
+          }
+        ].map((item, index) => (
+          <div 
+            key={index}
+            className="bg-white/5 rounded-lg p-6 border border-white/10 
+              transform transition-all duration-200 hover:scale-[1.02] hover:bg-white/10"
+          >
+            <div className="flex items-start gap-4">
+              <div className="text-4xl">{item.emoji}</div>
+              <div className="flex-1">
+                <h4 className="text-xl font-semibold text-white mb-2">{item.title}</h4>
+                <p className="text-white/70 mb-3">{item.description}</p>
+                <span className="text-sm px-3 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                  {item.highlight}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Side Buttons Container Component
+const SideButtons: React.FC = () => {
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  const handleOpenModal = (modalName: string) => {
+    setActiveModal(modalName);
+  };
+
+  const handleCloseModal = () => {
+    setActiveModal(null);
+  };
+
+  return (
+    <>
+      <div className="fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-4">
+        <SideButton 
+          label="FAQ"
+          icon={
+            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          order={1}
+          gradientFrom="from-purple-900"
+          gradientTo="to-indigo-900"
+          onClick={() => handleOpenModal('FAQ')}
+        />
+        <SideButton 
+          label="Roadmap"
+          icon={
+            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+          }
+          order={2}
+          gradientFrom="from-blue-900"
+          gradientTo="to-cyan-900"
+          onClick={() => handleOpenModal('Roadmap')}
+        />
+        <SideButton 
+          label="$SOOKA"
+          icon={
+            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          order={3}
+          gradientFrom="from-emerald-900"
+          gradientTo="to-teal-900"
+          onClick={() => handleOpenModal('$SOOKA')}
+        />
+        <SideButton 
+          label="Misc"
+          icon={
+            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            </svg>
+          }
+          order={4}
+          gradientFrom="from-rose-900"
+          gradientTo="to-pink-900"
+          onClick={() => handleOpenModal('Misc')}
+        />
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={activeModal === 'FAQ'}
+        onClose={handleCloseModal}
+        title="FAQ"
+      />
+      <Modal
+        isOpen={activeModal === 'Roadmap'}
+        onClose={handleCloseModal}
+        title="Roadmap"
+      >
+        <RoadmapContent />
+      </Modal>
+      <Modal
+        isOpen={activeModal === '$SOOKA'}
+        onClose={handleCloseModal}
+        title="$SOOKA Token"
+      >
+        <SookaTokenContent />
+      </Modal>
+      <Modal
+        isOpen={activeModal === 'Misc'}
+        onClose={handleCloseModal}
+        title="Misc"
+      />
+    </>
+  );
+};
+
+// Add this new component
+const QueryCounter: React.FC = () => {
+  const [queryCount, setQueryCount] = useState<number>(0);
+
+  // Fetch the current count when component mounts
+  useEffect(() => {
+    const fetchCount = async () => {
+      const response = await fetch('/api/counter');
+      const data = await response.json();
+      setQueryCount(data.count);
+    };
+
+    fetchCount();
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchCount, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="bg-black/20 p-5 rounded-xl backdrop-blur-sm shadow-lg mb-4">
+      <div className="text-center">
+        <div className="text-sm text-white/60 mb-1">Total Queries</div>
+        <div className="text-3xl font-bold text-white">
+          {queryCount.toLocaleString()}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -373,6 +805,7 @@ export default function Home() {
       content: inputValue,
       sender: 'user',
       timestamp: new Date(),
+      walletAddress: publicKey.toString(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -380,6 +813,10 @@ export default function Home() {
     setChatState('questionAsked');
 
     try {
+      // Increment the counter
+      await fetch('/api/counter', { method: 'POST' });
+
+      // Existing API call
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -452,19 +889,6 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  const resetTimer = () => {
-    setTimeRemaining(SECONDS_IN_HOUR);
-    fireConfetti();
-  };
-
-  const fireConfetti = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-  };
-
   const fireFireworks = () => {
     const duration = 5 * 1000;
     const animationEnd = Date.now() + duration;
@@ -493,16 +917,6 @@ export default function Home() {
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
       });
     }, 250);
-  };
-
-  const fireCannon = () => {
-    confetti({
-      particleCount: 150,
-      spread: 100,
-      origin: { y: 0.6 },
-      colors: ['#FFD700', '#FFA500', '#FF4500'],
-      angle: randomInRange(55, 125),
-    });
   };
 
 const sendSol = async () => {
@@ -565,17 +979,67 @@ console.log("Provider created");
     }
 };
 
+useEffect(() => {
+  const loadMessages = async () => {
+    const response = await fetch('/api/chat');
+    const data = await response.json();
+    
+    // Convert stored messages to your Message format
+    const formattedMessages = data.messages.flatMap(msg => [
+      {
+        id: Date.parse(msg.timestamp),
+        content: msg.query,
+        sender: 'user',
+        timestamp: new Date(msg.timestamp),
+        walletAddress: msg.walletAddress,
+      },
+      {
+        id: Date.parse(msg.timestamp) + 1,
+        content: msg.response,
+        sender: 'ai',
+        timestamp: new Date(msg.timestamp),
+      }
+    ]);
+    
+    setMessages(formattedMessages);
+  };
+
+  loadMessages();
+  // Poll for updates every 10 seconds
+  const interval = setInterval(loadMessages, 10000);
+  return () => clearInterval(interval);
+}, []);
+
+const enableFreeMode = () => {
+  if (!publicKey) {
+    setTransactionStatus({ 
+      state: 'error', 
+      message: 'Please connect your wallet first!' 
+    });
+    return;
+  }
+  setChatState('paid');
+  setTransactionStatus({ 
+    state: 'confirmed', 
+    message: 'Free mode enabled!' 
+  });
+};
+
 return (
     <div className="min-h-screen p-4 bg-background">
       <div className="absolute top-4 right-4">
         <WalletMultiButton />
       </div>
 
-      {/* Chat Area */}
+      {/* Side Buttons rem on left */}
+      <SideButtons />
+
+      {/* Chat Window - add a specific right margin to make space */}
       <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 
+        className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 
         w-[700px] h-[720px] bg-black/20 rounded-xl backdrop-blur-sm 
-        shadow-lg overflow-hidden border border-white/10 flex flex-col"
+        shadow-lg overflow-hidden border border-white/10 flex flex-col
+        mr-[250px]" // Add margin to shift left slightly
       >
         <ChatWindow messages={messages} messagesEndRef={messagesEndRef} />
         <MessageInput
@@ -586,22 +1050,27 @@ return (
         />
       </div>
 
-      {/* Side Panel */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+      {/* Right Side Panel - repositioned */}
+      <div className="fixed right-[40px] top-1/2 -translate-y-1/2 flex flex-col gap-3 w-[200px]">
+        <QueryCounter />
         <TransactionMonitor
           detectedTrigger={detectedTrigger}
           transactionStatus={transactionStatus}
         />
         <div className="bg-black/20 p-5 rounded-xl backdrop-blur-sm shadow-lg">
           <div className="text-center mb-2">
-            <div className="text-2xl font-bold text-white mb-2">
+            <div className="text-2xl font-bold text-white mb-1">
               Prize Pool: {prizePool.toFixed(2)} SOL
+            </div>
+            <div className="text-sm text-white/60 mb-2">
+              ≈ ${(prizePool * 250).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
             </div>
             <TimerDisplay timeRemaining={timeRemaining} />
           </div>
           
           <ButtonSet
             sendSol={sendSol}
+            enableFreeMode={enableFreeMode}
             transactionStatus={transactionStatus}
           />
         </div>
