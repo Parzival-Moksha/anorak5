@@ -992,19 +992,19 @@ useEffect(() => {
     const response = await fetch('/api/chat');
     const data = await response.json() as { messages: StoredMessage[] };
     
-    // Convert stored messages to your Message format
+    // Convert stored messages to your Message format with explicit sender types
     const formattedMessages = data.messages.flatMap((msg: StoredMessage) => [
       {
         id: Date.parse(msg.timestamp),
         content: msg.query,
-        sender: 'user',
+        sender: 'user' as const,  // Add explicit type
         timestamp: new Date(msg.timestamp),
         walletAddress: msg.walletAddress,
       },
       {
         id: Date.parse(msg.timestamp) + 1,
         content: msg.response,
-        sender: 'ai',
+        sender: 'ai' as const,    // Add explicit type
         timestamp: new Date(msg.timestamp),
       }
     ]);
