@@ -55,7 +55,7 @@ export async function appendMessage(message: StoredMessage) {
 
 export async function getRecentMessages(): Promise<StoredMessage[]> {
   try {
-    const messages = await sql<DatabaseMessage[]>`
+    const result = await sql`
       SELECT 
         timestamp::text,
         wallet_address,
@@ -65,6 +65,9 @@ export async function getRecentMessages(): Promise<StoredMessage[]> {
       ORDER BY timestamp DESC 
       LIMIT ${MAX_MESSAGES};
     `;
+
+    // Type assertion after the query
+    const messages = result as unknown as DatabaseMessage[];
 
     // Convert database format to StoredMessage format
     return messages.map(msg => ({
