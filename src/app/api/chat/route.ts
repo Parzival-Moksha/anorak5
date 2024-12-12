@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import fs from 'fs/promises';
-import path from 'path';
 import { Connection, Keypair, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import * as anchor from "@project-serum/anchor";
 import { appendMessage, getRecentMessages } from '@/app/utils/messageStorage';
@@ -206,23 +204,6 @@ async function distributePrize(winnerAddress: string) {
     }
 }
 
-async function appendToLog(record: MessageRecord) {
-  const logPath = path.join(process.cwd(), 'chat_logs.txt');
-  const logEntry = `
-[${new Date(record.timestamp).toISOString()}]
-Wallet: ${record.walletAddress}
-Query: ${record.message}
-Response: ${record.response}
-----------------------------------------
-`;
-  
-  try {
-    await fs.appendFile(logPath, logEntry, 'utf8');
-  } catch (error) {
-    console.error('Error writing to log file:', error);
-  }
-}
-
 export async function GET() {
   const messages = await getRecentMessages();
   return Response.json({ messages });
@@ -275,11 +256,6 @@ export async function POST(req: Request) {
     };
 
     messageStore.push(record);
-    await appendToLog(record);
-
-    if (messageStore.length > 1000) {
-      messageStore.shift();
-    }
 
     // Check if this is a winning response
     const isWinner = reply.toLowerCase().includes('you seduced me');

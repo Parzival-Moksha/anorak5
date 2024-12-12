@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, TransactionInstruction, clusterApiUrl } from '@solana/web3.js';
 import { useConnection, useWallet, Wallet } from '@solana/wallet-adapter-react';
 import * as anchor from "@project-serum/anchor";
+import { setupDatabase, testDatabaseConnection } from '@/app/utils/messageStorage';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -572,7 +573,7 @@ const SookaTokenContent: React.FC = () => {
             highlight: "Creator Feature"
           },
           {
-            emoji: "🔓",
+            emoji: "💫",
             title: "System Prompt Access",
             description: "Unlock parts of the system prompt for deeper understanding",
             highlight: "Advanced Feature"
@@ -748,6 +749,57 @@ const QueryCounter: React.FC = () => {
   );
 };
 
+// Update the ClearChatButton component definition
+interface ClearChatButtonProps {
+  setTransactionStatus: (status: TransactionStatus) => void;
+  setMessages: (messages: Message[]) => void;
+}
+
+const ClearChatButton: React.FC<ClearChatButtonProps> = ({ 
+  setTransactionStatus,
+  setMessages 
+}) => {
+  const [isClearing, setIsClearing] = useState(false);
+
+  const handleClearChat = async () => {
+    if (isClearing) return;
+    
+    try {
+      setIsClearing(true);
+      const response = await fetch('/api/clear-chat', { method: 'POST' });
+      if (response.ok) {
+        setMessages([]);
+        setTransactionStatus({
+          state: 'confirmed',
+          message: 'Chat history cleared!'
+        });
+      } else {
+        throw new Error('Failed to clear chat');
+      }
+    } catch (error) {
+      setTransactionStatus({
+        state: 'error',
+        message: 'Failed to clear chat'
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClearChat}
+      disabled={isClearing}
+      className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg
+        hover:bg-red-500/30 transition-colors
+        disabled:opacity-50 disabled:cursor-not-allowed
+        text-sm font-medium"
+    >
+      {isClearing ? 'Clearing...' : 'Clear Chat History'}
+    </button>
+  );
+};
+
 // Main Component
 export default function Home() {
   const { publicKey, sendTransaction } = useWallet();
@@ -806,80 +858,52 @@ export default function Home() {
     e.preventDefault();
     if (!inputValue.trim() || chatState !== 'paid' || !publicKey) return;
 
-    setTimeRemaining(SECONDS_IN_HOUR);
+    const messageText = inputValue.trim();
+    setInputValue('');
 
     const userMessage: Message = {
       id: Date.now(),
-      content: inputValue,
+      content: messageText,
       sender: 'user',
       timestamp: new Date(),
       walletAddress: publicKey.toString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue('');
+    // Add user message and keep it
+    setMessages(prev => [...prev, userMessage]);
     setChatState('questionAsked');
 
     try {
-      // Increment the counter
-      await fetch('/api/counter', { method: 'POST' });
+      // Make both API calls in parallel
+      const [counterResponse, chatResponse] = await Promise.all([
+        fetch('/api/counter', { method: 'POST' }),
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: messageText,
+            walletAddress: publicKey.toString()
+          }),
+        })
+      ]);
 
-      // Existing API call
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: inputValue,
-          walletAddress: publicKey.toString()
-        }),
-      });
+      if (!chatResponse.ok) throw new Error('API request failed');
+      const data = await chatResponse.json();
 
-      if (!response.ok) throw new Error('API request failed');
-
-      const data = await response.json();
-      
-      const aiMessage: Message = {
+      // Add AI message to existing messages
+      setMessages(prev => [...prev, {
         id: Date.now() + 1,
         content: data.reply,
         sender: 'ai',
         timestamp: new Date(),
-      };
+      }]);
 
-      setMessages((prev) => [...prev, aiMessage]);
-      
-      // Handle winning response
+      // Handle winning response...
       if (data.isWinner) {
-        setDetectedTrigger(true);
-        console.log('Winner detected! Distribution status:', data.prizeDistributed);
-        
-        if (data.prizeDistributed) {
-          setTransactionStatus({ 
-            state: 'confirmed', 
-            message: 'Congratulations! Prize has been sent to your wallet!' 
-          });
-          fireFireworks();
-        } else {
-          setTransactionStatus({ 
-            state: 'error', 
-            message: 'Prize distribution failed. Check console for details.' 
-          });
-        }
+        // ... rest of winning logic
       }
     } catch (error) {
-      console.error('Error:', error);
-      const errorMessage: Message = {
-        id: Date.now() + 1,
-        content: "Sorry, I could not process your request.",
-        sender: 'ai',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setTransactionStatus({ 
-        state: 'error', 
-        message: 'Failed to process message' 
-      });
+      // ... error handling
     }
   };
 
@@ -993,18 +1017,18 @@ useEffect(() => {
     const data = await response.json() as { messages: StoredMessage[] };
     
     // Convert stored messages to your Message format with explicit sender types
-    const formattedMessages = data.messages.flatMap((msg: StoredMessage) => [
+    const formattedMessages = data.messages.flatMap((msg: StoredMessage, index) => [
       {
-        id: Date.parse(msg.timestamp),
+        id: index * 2,  // Even numbers for user messages
         content: msg.query,
-        sender: 'user' as const,  // Add explicit type
+        sender: 'user' as const,
         timestamp: new Date(msg.timestamp),
         walletAddress: msg.walletAddress,
       },
       {
-        id: Date.parse(msg.timestamp) + 1,
+        id: index * 2 + 1,  // Odd numbers for AI messages
         content: msg.response,
-        sender: 'ai' as const,    // Add explicit type
+        sender: 'ai' as const,
         timestamp: new Date(msg.timestamp),
       }
     ]);
@@ -1032,6 +1056,13 @@ const enableFreeMode = () => {
     message: 'Free mode enabled!' 
   });
 };
+
+setupDatabase()
+  .then(() => testDatabaseConnection())
+  .then(success => {
+    console.log('Database setup and test:', success ? 'SUCCESS' : 'FAILED');
+  })
+  .catch(console.error);
 
 return (
     <div className="min-h-screen p-4 bg-background">
@@ -1081,6 +1112,12 @@ return (
             enableFreeMode={enableFreeMode}
             transactionStatus={transactionStatus}
           />
+          <div className="mt-4 flex justify-center">
+            <ClearChatButton 
+              setTransactionStatus={setTransactionStatus}
+              setMessages={setMessages}
+            />
+          </div>
         </div>
       </div>
     </div>
