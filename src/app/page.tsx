@@ -99,6 +99,14 @@ interface TransactionStatus {
   message: string;
 }
 
+// Add this interface near the top with other interfaces
+interface StoredMessage {
+  timestamp: string;
+  walletAddress: string;
+  query: string;
+  response: string;
+}
+
 // Helper Functions
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / SECONDS_IN_HOUR);
@@ -982,10 +990,10 @@ console.log("Provider created");
 useEffect(() => {
   const loadMessages = async () => {
     const response = await fetch('/api/chat');
-    const data = await response.json();
+    const data = await response.json() as { messages: StoredMessage[] };
     
     // Convert stored messages to your Message format
-    const formattedMessages = data.messages.flatMap(msg => [
+    const formattedMessages = data.messages.flatMap((msg: StoredMessage) => [
       {
         id: Date.parse(msg.timestamp),
         content: msg.query,
