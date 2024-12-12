@@ -17,6 +17,13 @@ interface StoredMessage {
   response: string;
 }
 
+interface DatabaseMessage {
+  timestamp: string;
+  wallet_address: string;
+  query: string;
+  response: string;
+}
+
 // First time setup - create the messages table
 export async function setupDatabase() {
   try {
@@ -48,17 +55,25 @@ export async function appendMessage(message: StoredMessage) {
 
 export async function getRecentMessages(): Promise<StoredMessage[]> {
   try {
-    const messages = await sql<StoredMessage[]>`
+    const messages = await sql<DatabaseMessage[]>`
       SELECT 
         timestamp::text,
-        wallet_address as "walletAddress",
+        wallet_address,
         query,
         response
       FROM messages 
       ORDER BY timestamp DESC 
       LIMIT ${MAX_MESSAGES};
     `;
-    return messages.reverse(); // Return in chronological order
+
+    // Convert database format to StoredMessage format
+    return messages.map(msg => ({
+      timestamp: msg.timestamp,
+      walletAddress: msg.wallet_address,
+      query: msg.query,
+      response: msg.response
+    })).reverse();
+
   } catch (error) {
     console.error('Error reading messages:', error);
     return [];
