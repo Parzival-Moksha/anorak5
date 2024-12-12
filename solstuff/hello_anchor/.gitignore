@@ -40,3 +40,8 @@ coverage/
 *.log
 *.temp
 temp/
+
+# Sensitive Wallet Data
+prize-distributor.json
+*wallet*.json
+*distributor*.json

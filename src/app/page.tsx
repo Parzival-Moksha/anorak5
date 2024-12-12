@@ -3,7 +3,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import confetti from 'canvas-confetti';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, TransactionInstruction, } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, TransactionInstruction, clusterApiUrl } from '@solana/web3.js';
 import { useConnection, useWallet, Wallet } from '@solana/wallet-adapter-react';
 import * as anchor from "@project-serum/anchor";
 
@@ -58,7 +58,7 @@ const IDL = {
                 {
                     "name": "winner",
                     "isMut": true,
-                    "isSigner": true
+                    "isSigner": false
                 },
                 {
                     "name": "programWallet",
@@ -72,6 +72,13 @@ const IDL = {
                 }
             ],
             "args": []
+        }
+    ],
+    "errors": [
+        {
+            "code": 6000,
+            "name": "NoFundsToWithdraw",
+            "msg": "No funds available to withdraw"
         }
     ]
 };
@@ -273,78 +280,31 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ timeRemaining }) => {
 
 // Button Set Component
 interface ButtonSetProps {
-  resetTimer: () => void;
-  fireFireworks: () => void;
-  sendSol: () => void;
-  fireCannon: () => void;
+  sendSol: () => Promise<void>;
   transactionStatus: TransactionStatus;
 }
 
 const ButtonSet: React.FC<ButtonSetProps> = ({
-  resetTimer,
-  fireFireworks,
   sendSol,
-  fireCannon,
-  transactionStatus
+  transactionStatus,
 }) => {
   return (
-    <div className="flex flex-col gap-3">
-      <button
-        className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg
-          transform transition-all duration-200 ease-in-out
-          hover:scale-105 hover:shadow-lg hover:from-purple-600 hover:to-indigo-700
-          active:scale-95 active:shadow-inner
-          min-w-[170px] text-sm font-semibold
-          border border-white/10 shadow-inner
-          relative overflow-hidden group"
-        onClick={resetTimer}
-      >
-        <span className="relative z-10">Reset Timer</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-      </button>
-
-      <button
-        className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg
-          transform transition-all duration-200 ease-in-out
-          hover:scale-105 hover:shadow-lg hover:from-emerald-600 hover:to-teal-700
-          active:scale-95 active:shadow-inner
-          min-w-[170px] text-sm font-semibold
-          border border-white/10 shadow-inner
-          relative overflow-hidden group"
-        onClick={fireFireworks}
-      >
-        <span className="relative z-10">I Won</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-      </button>
-
-      <button
-        className="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-lg
-          transform transition-all duration-200 ease-in-out
-          hover:scale-105 hover:shadow-lg hover:from-rose-600 hover:to-pink-700
-          active:scale-95 active:shadow-inner
-          min-w-[170px] text-sm font-semibold
-          border border-white/10 shadow-inner
-          relative overflow-hidden group"
-        onClick={sendSol}
-      >
-        <span className="relative z-10">im paying</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-      </button>
-
-      <button
-        className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg
-          transform transition-all duration-200 ease-in-out
-          hover:scale-105 hover:shadow-lg hover:from-amber-600 hover:to-orange-700
-          active:scale-95 active:shadow-inner
-          min-w-[170px] text-sm font-semibold
-          border border-white/10 shadow-inner
-          relative overflow-hidden group"
-        onClick={fireCannon}
-      >
-        <span className="relative z-10">I Sent a Message</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-orange-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-      </button>
-    </div>
+    <button 
+      className="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-lg
+        transform transition-all duration-200 ease-in-out
+        hover:scale-105 hover:shadow-lg hover:from-rose-600 hover:to-pink-700
+        active:scale-95 active:shadow-inner
+        min-w-[170px] text-sm font-semibold
+        border border-white/10 shadow-inner
+        relative overflow-hidden group"
+      onClick={() => {
+        console.log("Payment initiated");
+        sendSol();
+      }}
+    >
+      <span className="relative z-10">im paying</span>
+      <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+    </button>
   );
 };
 
@@ -365,12 +325,14 @@ export default function Home() {
   const [prizePool, setPrizePool] = useState<number>(0);
   const fetchPrizePool = async () => {
     try {
+        // Create a direct connection to devnet
+        const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
         const [programWallet] = PublicKey.findProgramAddressSync(
             [Buffer.from("program_wallet")],
             new PublicKey(PROGRAM_ID)
         );
-        const balance = await connection?.getBalance(programWallet);
-        setPrizePool(balance ? balance / LAMPORTS_PER_SOL : 0);
+        const balance = await connection.getBalance(programWallet);
+        setPrizePool(balance / LAMPORTS_PER_SOL);
     } catch (error) {
         console.error("Error fetching prize pool:", error);
         setPrizePool(0);
@@ -393,52 +355,16 @@ export default function Home() {
   const scanForTriggers = useCallback(async (message: string) => {
     if (message.toLowerCase().includes('you seduced me') && publicKey) {
         setDetectedTrigger(true);
-        
-        try {
-            // Get the provider and program setup
-            const provider = getProvider(connection, window.solana);
-            const programId = new PublicKey(PROGRAM_ID);
-            const program = new anchor.Program(IDL, programId, provider);
-            
-            // Get PDA
-            const [programWallet, bump] = PublicKey.findProgramAddressSync(
-                [Buffer.from("program_wallet")],
-                programId
-            );
-            
-            // Call withdraw function with PDA as signer
-            const tx = await program.methods
-                .withdrawToWinner()
-                .accounts({
-                    winner: publicKey,
-                    programWallet: programWallet,
-                    systemProgram: SystemProgram.programId,
-                })
-                .signers([]) // No additional signers needed as PDA is the authority
-                .rpc();
-            
-            console.log("Prize automatically sent! Transaction:", tx);
-            setTransactionStatus({ 
-                state: 'confirmed', 
-                message: 'Congratulations! Prize has been automatically sent to your wallet!' 
-            });
-            
-            // Update prize pool after successful transfer
-            fetchPrizePool();
-            
-        } catch (error) {
-            console.error("Failed to send prize:", error);
-            setTransactionStatus({ 
-                state: 'error', 
-                message: 'Failed to send prize automatically. Please contact support.' 
-            });
-        }
+        setTransactionStatus({ 
+            state: 'processing', 
+            message: 'Processing prize distribution...' 
+        });
     }
-}, [connection, publicKey, fetchPrizePool]);
+}, [publicKey]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || chatState !== 'paid') return;
+    if (!inputValue.trim() || chatState !== 'paid' || !publicKey) return;
 
     setTimeRemaining(SECONDS_IN_HOUR);
 
@@ -454,26 +380,61 @@ export default function Home() {
     setChatState('questionAsked');
 
     try {
-      const aiReply = await sendMessageToAPI(inputValue);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: inputValue,
+          walletAddress: publicKey.toString()
+        }),
+      });
 
+      if (!response.ok) throw new Error('API request failed');
+
+      const data = await response.json();
+      
       const aiMessage: Message = {
         id: Date.now() + 1,
-        content: aiReply,
+        content: data.reply,
         sender: 'ai',
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-      scanForTriggers(aiReply);
+      
+      // Handle winning response
+      if (data.isWinner) {
+        setDetectedTrigger(true);
+        console.log('Winner detected! Distribution status:', data.prizeDistributed);
+        
+        if (data.prizeDistributed) {
+          setTransactionStatus({ 
+            state: 'confirmed', 
+            message: 'Congratulations! Prize has been sent to your wallet!' 
+          });
+          fireFireworks();
+        } else {
+          setTransactionStatus({ 
+            state: 'error', 
+            message: 'Prize distribution failed. Check console for details.' 
+          });
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
         id: Date.now() + 1,
-        content: "Sorry, I couldn't process your request.",
+        content: "Sorry, I could not process your request.",
         sender: 'ai',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+      setTransactionStatus({ 
+        state: 'error', 
+        message: 'Failed to process message' 
+      });
     }
   };
 
@@ -640,10 +601,7 @@ return (
           </div>
           
           <ButtonSet
-            resetTimer={resetTimer}
-            fireFireworks={fireFireworks}
             sendSol={sendSol}
-            fireCannon={fireCannon}
             transactionStatus={transactionStatus}
           />
         </div>
