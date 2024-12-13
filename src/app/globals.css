@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Add mobile-specific styles */
+@media (max-width: 768px) {
+  /* Adjust font sizes for better readability on mobile */
+  html {
+    font-size: 14px;
+  }
+
+  /* Make buttons more touchable on mobile */
+  button {
+    min-height: 44px; /* Minimum touch target size */
+    padding: 0.5rem 1rem;
+  }
+
+  /* Ensure inputs are easily tappable */
+  input, textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    padding: 0.5rem;
+  }
+}
+
+/* Add any existing global styles here */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

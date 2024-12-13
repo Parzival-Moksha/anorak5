@@ -7,6 +7,8 @@ import { Connection, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, Tr
 import { useConnection, useWallet, Wallet } from '@solana/wallet-adapter-react';
 import * as anchor from "@project-serum/anchor";
 import { setupDatabase, testDatabaseConnection } from '@/app/utils/messageStorage';
+import { isMobileDevice } from './utils/deviceDetection';
+import TransactionMonitor from './components/TransactionMonitor';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -292,37 +294,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
     </form>
-  );
-};
-
-// Transaction Monitor Component
-interface TransactionMonitorProps {
-  detectedTrigger: boolean;
-  transactionStatus: TransactionStatus;
-}
-
-const TransactionMonitor: React.FC<TransactionMonitorProps> = ({
-  detectedTrigger,
-  transactionStatus,
-}) => {
-  return (
-    <div
-      className="fixed right-4 top-1/2 -translate-y-[280px] w-[200px] 
-      bg-black/40 backdrop-blur-sm rounded-lg 
-      border border-white/10 p-4 flex items-center justify-center"
-    >
-      <div className="text-center">
-        {detectedTrigger ? (
-          <div className="text-green-400">You won the heart of Sooka</div>
-        ) : (
-          <div className="text-white/30">Secret unclaimed</div>
-        )}
-        {/* Transaction Status Message */}
-        <div className="mt-2 text-sm text-white/50">
-          {transactionStatus.message}
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -625,97 +596,72 @@ const SookaTokenContent: React.FC = () => {
   );
 };
 
-// Side Buttons Container Component
-const SideButtons: React.FC = () => {
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-
-  const handleOpenModal = (modalName: string) => {
-    setActiveModal(modalName);
-  };
-
-  const handleCloseModal = () => {
-    setActiveModal(null);
-  };
+// First, modify the SideButtons component to lift the modal state up
+const SideButtons: React.FC<{ 
+  isMobile: boolean;
+  onOpenModal: (modalName: string) => void;
+}> = ({ isMobile, onOpenModal }) => {
+  const buttons = [
+    {
+      label: "FAQ",
+      icon: (
+        <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      gradientFrom: "from-purple-900",
+      gradientTo: "to-indigo-900",
+      onClick: () => onOpenModal('FAQ')
+    },
+    {
+      label: "Roadmap",
+      icon: (
+        <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      ),
+      gradientFrom: "from-blue-900",
+      gradientTo: "to-cyan-900",
+      onClick: () => onOpenModal('Roadmap')
+    },
+    {
+      label: "$SOOKA",
+      icon: (
+        <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      gradientFrom: "from-emerald-900",
+      gradientTo: "to-teal-900",
+      onClick: () => onOpenModal('$SOOKA')
+    },
+    {
+      label: "Misc",
+      icon: (
+        <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+        </svg>
+      ),
+      gradientFrom: "from-rose-900",
+      gradientTo: "to-pink-900",
+      onClick: () => onOpenModal('Misc')
+    }
+  ];
 
   return (
-    <>
-      <div className="fixed left-4 top-1/2 -translate-y-1/2 flex flex-col gap-4">
-        <SideButton 
-          label="FAQ"
-          icon={
-            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-          order={1}
-          gradientFrom="from-purple-900"
-          gradientTo="to-indigo-900"
-          onClick={() => handleOpenModal('FAQ')}
+    <div className={`
+      flex flex-col 
+      gap-4 ${isMobile && 'pb-4'}
+      ${isMobile ? 'w-[300px] mx-auto' : 'w-[300px]'}
+    `}>
+      {buttons.map((button, index) => (
+        <SideButton
+          key={index}
+          {...button}
+          order={index + 1}
         />
-        <SideButton 
-          label="Roadmap"
-          icon={
-            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-          }
-          order={2}
-          gradientFrom="from-blue-900"
-          gradientTo="to-cyan-900"
-          onClick={() => handleOpenModal('Roadmap')}
-        />
-        <SideButton 
-          label="$SOOKA"
-          icon={
-            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-          order={3}
-          gradientFrom="from-emerald-900"
-          gradientTo="to-teal-900"
-          onClick={() => handleOpenModal('$SOOKA')}
-        />
-        <SideButton 
-          label="Misc"
-          icon={
-            <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-            </svg>
-          }
-          order={4}
-          gradientFrom="from-rose-900"
-          gradientTo="to-pink-900"
-          onClick={() => handleOpenModal('Misc')}
-        />
-      </div>
-
-      {/* Modals */}
-      <Modal
-        isOpen={activeModal === 'FAQ'}
-        onClose={handleCloseModal}
-        title="FAQ"
-      />
-      <Modal
-        isOpen={activeModal === 'Roadmap'}
-        onClose={handleCloseModal}
-        title="Roadmap"
-      >
-        <RoadmapContent />
-      </Modal>
-      <Modal
-        isOpen={activeModal === '$SOOKA'}
-        onClose={handleCloseModal}
-        title="$SOOKA Token"
-      >
-        <SookaTokenContent />
-      </Modal>
-      <Modal
-        isOpen={activeModal === 'Misc'}
-        onClose={handleCloseModal}
-        title="Misc"
-      />
-    </>
+      ))}
+    </div>
   );
 };
 
@@ -815,6 +761,20 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { connection } = useConnection();
   const [prizePool, setPrizePool] = useState<number>(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+    
+    const handleResize = () => {
+      setIsMobile(isMobileDevice());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const fetchPrizePool = async () => {
     try {
         // Create a direct connection to devnet
@@ -1057,69 +1017,149 @@ const enableFreeMode = () => {
   });
 };
 
-setupDatabase()
-  .then(() => testDatabaseConnection())
-  .then(success => {
-    console.log('Database setup and test:', success ? 'SUCCESS' : 'FAILED');
-  })
-  .catch(console.error);
+// Run database setup only once when component mounts
+useEffect(() => {
+  const initDatabase = async () => {
+    try {
+      await setupDatabase();
+      const success = await testDatabaseConnection();
+      console.log('Database setup and test:', success ? 'SUCCESS' : 'FAILED');
+    } catch (error) {
+      console.error('Database initialization error:', error);
+    }
+  };
+
+  initDatabase();
+}, []); // Empty dependency array means this runs once on mount
+
+const handleOpenModal = (modalName: string) => {
+  setActiveModal(modalName);
+};
+
+const handleCloseModal = () => {
+  setActiveModal(null);
+};
 
 return (
-    <div className="min-h-screen p-4 bg-background">
-      <div className="absolute top-4 right-4">
+    <main className="min-h-screen p-4 bg-background">
+      {/* Wallet Connect Button - Fixed to top right */}
+      <div className="fixed top-4 right-4 z-50">
         <WalletMultiButton />
       </div>
 
-      {/* Side Buttons rem on left */}
-      <SideButtons />
-
-      {/* Chat Window - add a specific right margin to make space */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 
-        w-[700px] h-[720px] bg-black/20 rounded-xl backdrop-blur-sm 
-        shadow-lg overflow-hidden border border-white/10 flex flex-col
-        mr-[250px]" // Add margin to shift left slightly
-      >
-        <ChatWindow messages={messages} messagesEndRef={messagesEndRef} />
-        <MessageInput
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          handleSend={handleSend}
-          chatState={chatState}
-        />
-      </div>
-
-      {/* Right Side Panel - repositioned */}
-      <div className="fixed right-[40px] top-1/2 -translate-y-1/2 flex flex-col gap-3 w-[200px]">
-        <QueryCounter />
-        <TransactionMonitor
-          detectedTrigger={detectedTrigger}
-          transactionStatus={transactionStatus}
-        />
-        <div className="bg-black/20 p-5 rounded-xl backdrop-blur-sm shadow-lg">
-          <div className="text-center mb-2">
-            <div className="text-2xl font-bold text-white mb-1">
-              Prize Pool: {prizePool.toFixed(2)} SOL
+      {/* Main container with proper spacing from wallet button */}
+      <div className="mt-16 flex flex-col lg:block min-h-[calc(100vh-5rem)]">
+        {/* Right Panel - Counter, Transaction Monitor, Prize Pool */}
+        <div className={`
+          ${isMobile 
+            ? 'w-full order-1 mb-4' 
+            : 'fixed right-[40px] top-[50%] -translate-y-1/2'
+          }
+          flex flex-col gap-3 ${!isMobile && 'w-[200px]'} z-20
+        `}>
+          <div className="flex flex-col gap-3">
+            <QueryCounter />
+            
+            {/* Status Window */}
+            <div className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-4">
+              <TransactionMonitor
+                detectedTrigger={detectedTrigger}
+                transactionStatus={transactionStatus}
+              />
             </div>
-            <div className="text-sm text-white/60 mb-2">
-              ≈ ${(prizePool * 250).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+
+            {/* Prize Pool and Controls */}
+            <div className="bg-black/20 p-5 rounded-xl backdrop-blur-sm shadow-lg">
+              <div className="text-center mb-2">
+                <div className="text-2xl font-bold text-white mb-1">
+                  Prize Pool: {prizePool.toFixed(2)} SOL
+                </div>
+                <div className="text-sm text-white/60 mb-2">
+                  ≈ ${(prizePool * 250).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </div>
+                <TimerDisplay timeRemaining={timeRemaining} />
+              </div>
+              
+              <ButtonSet
+                sendSol={sendSol}
+                enableFreeMode={enableFreeMode}
+                transactionStatus={transactionStatus}
+              />
+              <div className="mt-4 flex justify-center">
+                <ClearChatButton 
+                  setTransactionStatus={setTransactionStatus}
+                  setMessages={setMessages}
+                />
+              </div>
             </div>
-            <TimerDisplay timeRemaining={timeRemaining} />
           </div>
-          
-          <ButtonSet
-            sendSol={sendSol}
-            enableFreeMode={enableFreeMode}
-            transactionStatus={transactionStatus}
+        </div>
+
+        {/* Left Panel - Side Buttons */}
+        <div className={`
+          ${isMobile 
+            ? 'w-full order-2 mb-4' 
+            : 'fixed left-4 top-[50%] -translate-y-1/2 w-[300px]'
+          }
+        `}>
+          <SideButtons 
+            isMobile={isMobile} 
+            onOpenModal={handleOpenModal}
           />
-          <div className="mt-4 flex justify-center">
-            <ClearChatButton 
-              setTransactionStatus={setTransactionStatus}
-              setMessages={setMessages}
+        </div>
+
+        {/* Move Modals here, outside of any width constraints */}
+        <Modal
+          isOpen={activeModal === 'FAQ'}
+          onClose={handleCloseModal}
+          title="FAQ"
+        />
+        <Modal
+          isOpen={activeModal === 'Roadmap'}
+          onClose={handleCloseModal}
+          title="Roadmap"
+        >
+          <RoadmapContent />
+        </Modal>
+        <Modal
+          isOpen={activeModal === '$SOOKA'}
+          onClose={handleCloseModal}
+          title="$SOOKA Token"
+        >
+          <SookaTokenContent />
+        </Modal>
+        <Modal
+          isOpen={activeModal === 'Misc'}
+          onClose={handleCloseModal}
+          title="Misc"
+        />
+
+        {/* Center Chat Window */}
+        <div className={`
+          ${isMobile 
+            ? 'w-full order-3' 
+            : 'mx-auto max-w-[700px] relative'
+          }
+          ${!isMobile && 'h-[720px] mt-[calc(50vh-360px)]'}
+        `}>
+          <div className={`
+            bg-black/20 rounded-xl backdrop-blur-sm shadow-lg
+            overflow-hidden border border-white/10 flex flex-col
+            ${isMobile ? 'h-[500px]' : 'h-[720px]'}
+          `}>
+            <div className="flex-1 overflow-y-auto">
+              <ChatWindow messages={messages} messagesEndRef={messagesEndRef} />
+            </div>
+            
+            <MessageInput
+              inputValue={inputValue}
+              setInputValue={setInputValue}
+              handleSend={handleSend}
+              chatState={chatState}
             />
           </div>
         </div>
       </div>
-    </div>
-  );
+    </main>
+);
 }
