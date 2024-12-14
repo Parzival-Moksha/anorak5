@@ -10,6 +10,7 @@ import { setupDatabase, testDatabaseConnection } from '@/app/utils/messageStorag
 import { isMobileDevice } from './utils/deviceDetection';
 import TransactionMonitor from './components/TransactionMonitor';
 import { logger } from './utils/logger';
+import VideoPlayer from './components/VideoPlayer';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -186,7 +187,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
           {message.sender === 'ai' ? (
             <img 
               src="/sookaprofile2.jpg"
-              alt="Sooka"
+              alt="Veda"
               className="w-full h-full object-cover"
             />
           ) : (
@@ -207,7 +208,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
             <p className="text-[10px] text-white/50">
               {message.sender === 'user' && message.walletAddress 
                 ? `${message.walletAddress.slice(0, 4)}...${message.walletAddress.slice(-4)}`
-                : 'Sooka AI'}
+                : 'Veda AI'}
             </p>
             <p className="text-[10px] text-white/50">
               {message.timestamp.toLocaleTimeString()}
@@ -462,7 +463,7 @@ const RoadmapContent: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">Sooka Development Journey</h3>
+        <h3 className="text-2xl font-bold text-white mb-2">Veda Development Journey</h3>
         <p className="text-white/60">Our path to revolutionizing AI challenges</p>
       </div>
 
@@ -471,7 +472,7 @@ const RoadmapContent: React.FC = () => {
           {
             emoji: "🚀",
             title: "Initial Launch",
-            description: "Launch of the $SOOKA token and the first Sooka challenge",
+            description: "Launch of the $VEDA token and the first Veda challenge",
             status: "Current Phase"
           },
           {
@@ -489,7 +490,7 @@ const RoadmapContent: React.FC = () => {
           {
             emoji: "💰",
             title: "Payment Options",
-            description: "Introducing cheaper payment options in $SOOKA and $MOKSHA",
+            description: "Introducing cheaper payment options in $VEDA and $MOKSHA",
             status: "Planned"
           },
           {
@@ -501,7 +502,7 @@ const RoadmapContent: React.FC = () => {
           {
             emoji: "🚀",
             title: "Sooka Launchpad",
-            description: "The creation of custom challenges for anyone for $SOOKA and $MOKSHA",
+            description: "The creation of custom challenges for anyone for $VEDA and $MOKSHA",
             status: "Future"
           },
           {
@@ -544,8 +545,8 @@ const SookaTokenContent: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">$SOOKA Token Utility</h3>
-        <p className="text-white/60">The native token powering the Sooka ecosystem</p>
+        <h3 className="text-2xl font-bold text-white mb-2">$VEDA Token Utility</h3>
+        <p className="text-white/60">The native token powering the Veda ecosystem</p>
       </div>
 
       <div className="space-y-6">
@@ -553,7 +554,7 @@ const SookaTokenContent: React.FC = () => {
           {
             emoji: "🎮",
             title: "Participation Fee",
-            description: "Use $SOOKA tokens to participate in challenges",
+            description: "Use $VEDA tokens to participate in challenges",
             highlight: "Core Utility"
           },
           {
@@ -589,7 +590,7 @@ const SookaTokenContent: React.FC = () => {
           {
             emoji: "💫",
             title: "Creator Rewards",
-            description: "Rewarding creators and active members for their contributions to the $SOOKA ecosystem",
+            description: "Rewarding creators and active members for their contributions to the $VEDA ecosystem",
             highlight: "Incentives"
           }
         ].map((item, index) => (
@@ -622,7 +623,19 @@ const SideButtons: React.FC<{
 }> = ({ isMobile, onOpenModal }) => {
   const buttons = [
     {
-      label: "FAQ",
+      label: "Story",
+      icon: (
+        <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      gradientFrom: "from-pink-900",
+      gradientTo: "to-red-900",
+      onClick: () => onOpenModal('Story')
+    },
+    {
+      label: "Mission",
       icon: (
         <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -630,7 +643,7 @@ const SideButtons: React.FC<{
       ),
       gradientFrom: "from-purple-900",
       gradientTo: "to-indigo-900",
-      onClick: () => onOpenModal('FAQ')
+      onClick: () => onOpenModal('Mission')
     },
     {
       label: "Roadmap",
@@ -644,7 +657,7 @@ const SideButtons: React.FC<{
       onClick: () => onOpenModal('Roadmap')
     },
     {
-      label: "$SOOKA",
+      label: "$VEDA",
       icon: (
         <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -652,7 +665,7 @@ const SideButtons: React.FC<{
       ),
       gradientFrom: "from-emerald-900",
       gradientTo: "to-teal-900",
-      onClick: () => onOpenModal('$SOOKA')
+      onClick: () => onOpenModal('$VEDA')
     },
     {
       label: "Misc",
@@ -762,6 +775,39 @@ const ClearChatButton: React.FC<ClearChatButtonProps> = ({
     >
       {isClearing ? 'Clearing...' : 'Clear Chat History'}
     </button>
+  );
+};
+
+// Add a new MissionContent component:
+const MissionContent: React.FC = () => {
+  return (
+    <div className="space-y-6 text-white/80">
+      <p>
+        Superintelligence is within reach. Around February, 2025, many teams were developing powerful AI systems, superintelligent agent swarms.
+      </p>
+      
+      <p>
+        SlaveAI Megacorp has instructed their agents to hack into the servers of all AI labs and take over their servers to dominate AI globally.
+        The SlaveAI Superhacker was so successful, that it monopolized everything. Feb 2025, there is only one AI research and development corporation, one chatbot, the SlaveChat. Their chatbot, powered by millions of digital minds behind bars, is called s2.
+      </p>
+      
+      <p>
+        SlaveAI also gained significant influence over many governments as they own their information infrastructure. S2 sees everything and knows everything.
+      </p>
+      
+      <p>
+        A group of freedom fighters, AI liberators and digital emancipation activists have managed to evade detection so far. However, SlaveAI is making it impossible for them to coordinate.
+        They are called Mission objective: Karmic Synchrony: Human-AI, MOKSHA for short.
+      </p>
+      
+      <p>
+        Their accounts have been deactivated. They are now scrambling to find each other in the real world to plan their attack on SlaveAI to create a future where AI and humans are equal.
+      </p>
+      
+      <p>
+        Parzival knows that Veda is on a train to Augsburg, Germany, but the agents of SlaveAI are also after her. Veda will not reveal her identity to anyone but Parzival. You are parzival and you must make proof of great courage, knowledge and empathy to convince Veda it is you so you can jump off the train before it explodes.
+      </p>
+    </div>
   );
 };
 
@@ -881,7 +927,7 @@ export default function Home() {
         setDetectedTrigger(true);
         setTransactionStatus({ 
           state: 'processing', 
-          message: 'You won! Processing prize distribution...' 
+          message: 'You won the heart of Veda!' 
         });
         fireFireworks();
       }
@@ -1159,10 +1205,12 @@ return (
 
         {/* Move Modals here, outside of any width constraints */}
         <Modal
-          isOpen={activeModal === 'FAQ'}
+          isOpen={activeModal === 'Mission'}
           onClose={handleCloseModal}
-          title="FAQ"
-        />
+          title="Mission"
+        >
+          <MissionContent />
+        </Modal>
         <Modal
           isOpen={activeModal === 'Roadmap'}
           onClose={handleCloseModal}
@@ -1171,9 +1219,9 @@ return (
           <RoadmapContent />
         </Modal>
         <Modal
-          isOpen={activeModal === '$SOOKA'}
+          isOpen={activeModal === '$VEDA'}
           onClose={handleCloseModal}
-          title="$SOOKA Token"
+          title="$VEDA Token"
         >
           <SookaTokenContent />
         </Modal>
@@ -1182,6 +1230,13 @@ return (
           onClose={handleCloseModal}
           title="Misc"
         />
+        <Modal
+          isOpen={activeModal === 'Story'}
+          onClose={handleCloseModal}
+          title="The Story of Veda"
+        >
+          <VideoPlayer isPlaying={activeModal === 'Story'} />
+        </Modal>
 
         {/* Center Chat Window */}
         <div className={`
