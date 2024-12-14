@@ -3,8 +3,10 @@ import { logger } from './logger';
 import { createDatabaseError } from './errors';
 import 'dotenv/config';
 
-// Specify the type arguments for NeonQueryFunction
 let sql: NeonQueryFunction<false, false>;
+let cachedMessages: StoredMessage[] = [];
+let isInitialized = false;
+
 try {
   if (!process.env.DATABASE_URL) {
     throw createDatabaseError('DATABASE_URL is not defined in environment variables');
@@ -32,9 +34,12 @@ interface DatabaseMessage {
   response: string;
 }
 
-// First time setup - create the messages table
+// First time setup - create the messages table and load messages
 export async function setupDatabase() {
+  if (isInitialized) return;
+  
   try {
+    // Create table if it doesn't exist
     await sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -44,6 +49,12 @@ export async function setupDatabase() {
         response TEXT NOT NULL
       );
     `;
+
+    // Load all messages into cache
+    await loadAllMessages();
+    
+    isInitialized = true;
+    logger.info('Database setup complete and messages loaded');
   } catch (err) {
     const error = err as Error;
     logger.error('Error setting up database:', error);
@@ -51,19 +62,15 @@ export async function setupDatabase() {
   }
 }
 
-export async function appendMessage(message: StoredMessage) {
-  try {
-    await sql`
-      INSERT INTO messages (timestamp, wallet_address, query, response)
-      VALUES (${message.timestamp}, ${message.walletAddress}, ${message.query}, ${message.response});
-    `;
-  } catch (err) {
-    const error = err as Error;
-    logger.error('Error saving message:', error);
+// Add this to ensure database is initialized before any operations
+async function ensureInitialized() {
+  if (!isInitialized) {
+    await setupDatabase();
   }
 }
 
-export async function getRecentMessages(): Promise<StoredMessage[]> {
+// New function to load all messages
+async function loadAllMessages() {
   try {
     const result = await sql`
       SELECT 
@@ -72,24 +79,47 @@ export async function getRecentMessages(): Promise<StoredMessage[]> {
         query,
         response
       FROM messages 
-      ORDER BY timestamp DESC 
-      LIMIT ${MAX_MESSAGES};
+      ORDER BY timestamp ASC;
     `;
 
-    // Type assertion after the query
     const messages = result as unknown as DatabaseMessage[];
-
-    // Convert database format to StoredMessage format
-    return messages.map(msg => ({
+    
+    // Update cache with all messages
+    cachedMessages = messages.map(msg => ({
       timestamp: msg.timestamp,
       walletAddress: msg.wallet_address,
       query: msg.query,
       response: msg.response
-    })).reverse();
+    }));
 
-  } catch (error) {
-    logger.error('Error reading messages:', error);
-    return [];
+    logger.info(`Loaded ${cachedMessages.length} messages from database`);
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Error loading messages:', error);
+    throw error;
+  }
+}
+
+// Update getRecentMessages to use cache
+export async function getRecentMessages(): Promise<StoredMessage[]> {
+  await ensureInitialized();
+  return cachedMessages.slice(-MAX_MESSAGES).reverse();
+}
+
+// Update appendMessage to update cache
+export async function appendMessage(message: StoredMessage) {
+  await ensureInitialized();
+  try {
+    await sql`
+      INSERT INTO messages (timestamp, wallet_address, query, response)
+      VALUES (${message.timestamp}, ${message.walletAddress}, ${message.query}, ${message.response});
+    `;
+    // Update cache
+    cachedMessages.push(message);
+    logger.info('Message added to database and cache');
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Error saving message:', error);
   }
 }
 
@@ -97,7 +127,7 @@ export async function getRecentMessages(): Promise<StoredMessage[]> {
 export async function testDatabaseConnection() {
   try {
     const result = await sql`SELECT NOW();`;
-    logger.info('Database connection successful:', result);
+    logger.info('Database connection successful');
 
     await setupDatabase();
     logger.info('Database table created/verified');
@@ -105,7 +135,7 @@ export async function testDatabaseConnection() {
     return true;
   } catch (err) {
     const error = err as Error;
-    logger.error('Database test failed:', error.message);
+    logger.error('Database test failed:', error);
     return false;
   }
-} 
+}

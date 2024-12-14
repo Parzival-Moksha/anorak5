@@ -6,11 +6,11 @@ export function validateEnv() {
 
   if (missing.length > 0) {
     logger.error(`Missing required environment variables: ${missing.join(', ')}`);
-    logger.info('Available environment variables:', 
+    logger.info(`Available environment variables: ${
       Object.keys(process.env)
         .filter(key => !key.includes('SECRET'))
         .join(', ')
-    );
+    }`);
     throw new Error('Missing required environment variables');
   }
 

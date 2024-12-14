@@ -9,6 +9,7 @@ import * as anchor from "@project-serum/anchor";
 import { setupDatabase, testDatabaseConnection } from '@/app/utils/messageStorage';
 import { isMobileDevice } from './utils/deviceDetection';
 import TransactionMonitor from './components/TransactionMonitor';
+import { logger } from './utils/logger';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -1004,20 +1005,29 @@ useEffect(() => {
   const loadMessages = async () => {
     try {
       const response = await fetch('/api/chat');
-      if (!response.ok) throw new Error('Failed to fetch messages');
-      const data = (await response.json()) as { messages: StoredMessage[] };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch messages');
+      }
       
+      const data = await response.json() as { messages: StoredMessage[] };
+      
+      if (!data.messages) {
+        logger.warn('No messages found in response');
+        return;
+      }
+
       // Convert stored messages to your Message format with explicit sender types
       const formattedMessages = data.messages.flatMap((msg: StoredMessage, index) => [
         {
-          id: index * 2,  // Even numbers for user messages
+          id: index * 2,
           content: msg.query,
           sender: 'user' as const,
           timestamp: new Date(msg.timestamp),
           walletAddress: msg.walletAddress,
         },
         {
-          id: index * 2 + 1,  // Odd numbers for AI messages
+          id: index * 2 + 1,
           content: msg.response,
           sender: 'ai' as const,
           timestamp: new Date(msg.timestamp),
@@ -1027,12 +1037,14 @@ useEffect(() => {
       setMessages(formattedMessages);
     } catch (err) {
       const error = err as Error;
-      console.error('Error loading messages:', error.message);
-      return [];
+      logger.error('Error loading messages:', error);
+      // Don't return empty array here, keep existing messages
     }
   };
 
+  // Initial load
   loadMessages();
+
   // Poll for updates every 10 seconds
   const interval = setInterval(loadMessages, 10000);
   return () => clearInterval(interval);
