@@ -241,6 +241,7 @@ interface MessageInputProps {
   setInputValue: (value: string) => void;
   handleSend: (e: React.FormEvent) => void;
   chatState: ChatState;
+  isProcessing: boolean;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -248,40 +249,57 @@ const MessageInput: React.FC<MessageInputProps> = ({
   setInputValue,
   handleSend,
   chatState,
+  isProcessing,
 }) => {
   const showUnlockMessage = chatState === 'idle';
   const showResendMessage = chatState === 'questionAsked';
 
   return (
     <form onSubmit={handleSend} className="p-4 border-t border-white/10">
-      <div className="flex gap-2">
+      <div className="flex gap-2 relative">
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          className={`flex-1 bg-white/10 rounded-lg px-4 py-2 text-white placeholder-white/50 
-            focus:outline-none focus:ring-2 focus:ring-purple-500
-            ${chatState !== 'paid' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`
+            flex-1 bg-white/10 rounded-lg px-4 py-2 text-white 
+            placeholder-white/50 focus:outline-none focus:ring-2 
+            focus:ring-purple-500
+            ${chatState !== 'paid' || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
           placeholder={
-            chatState === 'idle'
+            isProcessing
+              ? "Processing..."
+              : chatState === 'idle'
               ? "pay first"
               : chatState === 'questionAsked'
               ? "You have already asked a question. Pay again to ask another."
               : "Type your message..."
           }
-          disabled={chatState !== 'paid'}
+          disabled={chatState !== 'paid' || isProcessing}
         />
+        
+        {/* Processing Spinner */}
+        {isProcessing && (
+          <div className="absolute right-16 top-1/2 -translate-y-1/2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white/30"></div>
+          </div>
+        )}
+
         <button
           type="submit"
-          className={`px-4 py-3 bg-purple-500 rounded-lg text-white transition-colors
-            ${chatState === 'paid'
-              ? 'hover:bg-purple-600'
-              : 'opacity-50 cursor-not-allowed bg-purple-400'}`}
-          disabled={chatState !== 'paid'}
+          disabled={chatState !== 'paid' || isProcessing}
+          className={`
+            px-4 py-3 rounded-lg text-white transition-colors
+            ${chatState === 'paid' && !isProcessing
+              ? 'bg-purple-500 hover:bg-purple-600'
+              : 'opacity-50 cursor-not-allowed bg-purple-400'}
+          `}
         >
-          Send
+          {isProcessing ? '...' : 'Send'}
         </button>
       </div>
+
       {/* Status messages */}
       {showUnlockMessage && (
         <div className="text-sm text-white/50 mt-2">
@@ -763,6 +781,7 @@ export default function Home() {
   const [prizePool, setPrizePool] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     setIsMobile(isMobileDevice());
@@ -820,18 +839,7 @@ export default function Home() {
 
     const messageText = inputValue.trim();
     setInputValue('');
-
-    const userMessage: Message = {
-      id: Date.now(),
-      content: messageText,
-      sender: 'user',
-      timestamp: new Date(),
-      walletAddress: publicKey.toString(),
-    };
-
-    // Add user message and keep it
-    setMessages(prev => [...prev, userMessage]);
-    setChatState('questionAsked');
+    setIsProcessing(true);
 
     try {
       // Make both API calls in parallel
@@ -850,20 +858,41 @@ export default function Home() {
       if (!chatResponse.ok) throw new Error('API request failed');
       const data = await chatResponse.json();
 
-      // Add AI message to existing messages
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        content: data.reply,
-        sender: 'ai',
-        timestamp: new Date(),
-      }]);
+      // Add both messages at once when we have the response
+      setMessages(prev => [...prev, 
+        {
+          id: Date.now(),
+          content: messageText,
+          sender: 'user',
+          timestamp: new Date(),
+          walletAddress: publicKey.toString(),
+        },
+        {
+          id: Date.now() + 1,
+          content: data.reply,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+      ]);
 
-      // Handle winning response...
+      // Handle winning condition
       if (data.isWinner) {
-        // ... rest of winning logic
+        setDetectedTrigger(true);
+        setTransactionStatus({ 
+          state: 'processing', 
+          message: 'You won! Processing prize distribution...' 
+        });
+        fireFireworks();
       }
+
+      // Lock the chat after successful message exchange
+      setChatState('questionAsked');
+
     } catch (error) {
-      // ... error handling
+      console.error('Error:', error);
+      // Handle error state
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -973,27 +1002,34 @@ console.log("Provider created");
 
 useEffect(() => {
   const loadMessages = async () => {
-    const response = await fetch('/api/chat');
-    const data = await response.json() as { messages: StoredMessage[] };
-    
-    // Convert stored messages to your Message format with explicit sender types
-    const formattedMessages = data.messages.flatMap((msg: StoredMessage, index) => [
-      {
-        id: index * 2,  // Even numbers for user messages
-        content: msg.query,
-        sender: 'user' as const,
-        timestamp: new Date(msg.timestamp),
-        walletAddress: msg.walletAddress,
-      },
-      {
-        id: index * 2 + 1,  // Odd numbers for AI messages
-        content: msg.response,
-        sender: 'ai' as const,
-        timestamp: new Date(msg.timestamp),
-      }
-    ]);
-    
-    setMessages(formattedMessages);
+    try {
+      const response = await fetch('/api/chat');
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      const data = (await response.json()) as { messages: StoredMessage[] };
+      
+      // Convert stored messages to your Message format with explicit sender types
+      const formattedMessages = data.messages.flatMap((msg: StoredMessage, index) => [
+        {
+          id: index * 2,  // Even numbers for user messages
+          content: msg.query,
+          sender: 'user' as const,
+          timestamp: new Date(msg.timestamp),
+          walletAddress: msg.walletAddress,
+        },
+        {
+          id: index * 2 + 1,  // Odd numbers for AI messages
+          content: msg.response,
+          sender: 'ai' as const,
+          timestamp: new Date(msg.timestamp),
+        }
+      ]);
+      
+      setMessages(formattedMessages);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error loading messages:', error.message);
+      return [];
+    }
   };
 
   loadMessages();
@@ -1024,8 +1060,9 @@ useEffect(() => {
       await setupDatabase();
       const success = await testDatabaseConnection();
       console.log('Database setup and test:', success ? 'SUCCESS' : 'FAILED');
-    } catch (error) {
-      console.error('Database initialization error:', error);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Database initialization error:', error.message);
     }
   };
 
@@ -1156,6 +1193,7 @@ return (
               setInputValue={setInputValue}
               handleSend={handleSend}
               chatState={chatState}
+              isProcessing={isProcessing}
             />
           </div>
         </div>

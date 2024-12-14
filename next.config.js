@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    DATABASE_URL: process.env.DATABASE_URL,
+    // Remove DATABASE_URL from here
   },
 }
 
