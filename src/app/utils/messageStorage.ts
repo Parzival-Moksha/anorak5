@@ -1,7 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import 'dotenv/config';
 
-let sql;
+let sql: NeonQueryFunction;
 try {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined in environment variables');
@@ -11,6 +11,7 @@ try {
   const error = err as Error;
   console.error('Failed to initialize database connection:', error.message);
   // You might want to handle this differently depending on your needs
+  throw error; // Re-throw to prevent usage with undefined sql
 }
 
 const MAX_MESSAGES = 20;
