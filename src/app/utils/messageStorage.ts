@@ -1,17 +1,19 @@
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { logger } from './logger';
+import { createDatabaseError } from './errors';
 import 'dotenv/config';
 
-let sql: NeonQueryFunction;
+// Specify the type arguments for NeonQueryFunction
+let sql: NeonQueryFunction<false, false>;
 try {
   if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not defined in environment variables');
+    throw createDatabaseError('DATABASE_URL is not defined in environment variables');
   }
   sql = neon(process.env.DATABASE_URL);
 } catch (err) {
   const error = err as Error;
-  console.error('Failed to initialize database connection:', error.message);
-  // You might want to handle this differently depending on your needs
-  throw error; // Re-throw to prevent usage with undefined sql
+  logger.error('Failed to initialize database connection:', error);
+  throw error;
 }
 
 const MAX_MESSAGES = 20;
@@ -42,8 +44,9 @@ export async function setupDatabase() {
         response TEXT NOT NULL
       );
     `;
-  } catch (error) {
-    console.error('Error setting up database:', error);
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Error setting up database:', error);
     throw error;
   }
 }
@@ -54,8 +57,9 @@ export async function appendMessage(message: StoredMessage) {
       INSERT INTO messages (timestamp, wallet_address, query, response)
       VALUES (${message.timestamp}, ${message.walletAddress}, ${message.query}, ${message.response});
     `;
-  } catch (error) {
-    console.error('Error saving message:', error);
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Error saving message:', error);
   }
 }
 
@@ -84,7 +88,7 @@ export async function getRecentMessages(): Promise<StoredMessage[]> {
     })).reverse();
 
   } catch (error) {
-    console.error('Error reading messages:', error);
+    logger.error('Error reading messages:', error);
     return [];
   }
 }
@@ -93,15 +97,15 @@ export async function getRecentMessages(): Promise<StoredMessage[]> {
 export async function testDatabaseConnection() {
   try {
     const result = await sql`SELECT NOW();`;
-    console.log('Database connection successful:', result);
+    logger.info('Database connection successful:', result);
 
     await setupDatabase();
-    console.log('Database table created/verified');
+    logger.info('Database table created/verified');
 
     return true;
   } catch (err) {
     const error = err as Error;
-    console.error('Database test failed:', error.message);
+    logger.error('Database test failed:', error.message);
     return false;
   }
 } 

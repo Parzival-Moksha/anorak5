@@ -7,6 +7,12 @@ import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { useMemo } from 'react';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import './globals.css';
+import { validateEnv } from './utils/env';
+
+// Call validation before app renders
+if (typeof window === 'undefined') {
+  validateEnv();
+}
 
 export default function RootLayout({
   children,
