@@ -1,19 +1,15 @@
 import { logger } from './logger';
 
-export function validateEnv() {
+export const validateEnv = () => {
+  // Only run on server
+  if (typeof window !== 'undefined') return;
+
   const required = ['DATABASE_URL'];
-  const missing = required.filter(name => !process.env[name]);
-
+  const missing = required.filter(key => !process.env[key]);
+  
   if (missing.length > 0) {
-    logger.error(`Missing required environment variables: ${missing.join(', ')}`);
-    logger.info(`Available environment variables: ${
-      Object.keys(process.env)
-        .filter(key => !key.includes('SECRET'))
-        .join(', ')
-    }`);
-    throw new Error('Missing required environment variables');
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`
+    );
   }
-
-  // Log success but not the actual values
-  logger.info('All required environment variables are set');
-} 
+}; 

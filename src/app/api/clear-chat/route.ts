@@ -1,54 +1,35 @@
 import { neon } from '@neondatabase/serverless';
+import { NextResponse } from 'next/server';
+import { logger } from '@/app/utils/logger';
 
-// Check if DATABASE_URL exists
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not defined in environment variables');
+  throw new Error('DATABASE_URL is not defined');
 }
 
 const sql = neon(process.env.DATABASE_URL);
 
 export async function POST() {
   try {
-    // Get current timestamp for archive name
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    
-    // Create archive table with timestamp
-    await sql`
-      CREATE TABLE IF NOT EXISTS chat_archives (
-        archive_id SERIAL PRIMARY KEY,
-        archive_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        archive_name TEXT,
-        messages JSONB
-      )
-    `;
-
-    // Get current messages
+    // Archive current messages before deletion (optional but recommended)
     const currentMessages = await sql`SELECT * FROM messages ORDER BY timestamp`;
+    
+    if (currentMessages.length > 0) {
+      await sql`
+        INSERT INTO chat_archives (archive_date, messages)
+        VALUES (NOW(), ${JSON.stringify(currentMessages)})
+      `;
+    }
 
-    // Store messages in archive
-    await sql`
-      INSERT INTO chat_archives (archive_name, messages)
-      VALUES (
-        ${`archive_${timestamp}`},
-        ${JSON.stringify(currentMessages)}
-      )
-    `;
-
-    // Clear current messages
+    // Clear all messages from the messages table
     await sql`TRUNCATE TABLE messages`;
 
-    return Response.json({ 
-      success: true,
-      archiveName: `archive_${timestamp}`,
-      messageCount: currentMessages.length
-    });
+    logger.info('Chat history cleared successfully');
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error archiving chat:', error);
-    return Response.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to archive chat' 
-    }, { 
-      status: 500 
-    });
+    logger.error('Failed to clear chat history:', error as Error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to clear chat history' },
+      { status: 500 }
+    );
   }
 } 

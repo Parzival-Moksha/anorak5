@@ -7,20 +7,12 @@ interface LogMessage {
   timestamp: string;
 }
 
-// Create a safe logging function
-const createSafeLog = (logFn: typeof console.log) => {
-  return Function.prototype.bind.call(logFn, console);
-};
-
-// Safe console wrapper
+// Create a type-safe console wrapper
 const safeConsole = {
-  // eslint-disable-next-line no-console
-  log: createSafeLog(console.log),
-  // eslint-disable-next-line no-console
-  warn: createSafeLog(console.warn),
-  // eslint-disable-next-line no-console
-  error: createSafeLog(console.error)
-};
+  log: Function.prototype.bind.call(console.log, console),
+  warn: Function.prototype.bind.call(console.warn, console),
+  error: Function.prototype.bind.call(console.error, console)
+} as const;
 
 // Create formatted log messages
 const formatLogMessage = (level: string, message: string, errorMsg?: string): string => {

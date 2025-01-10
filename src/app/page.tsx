@@ -11,6 +11,7 @@ import { isMobileDevice } from './utils/deviceDetection';
 import TransactionMonitor from './components/TransactionMonitor';
 import { logger } from './utils/logger';
 import VideoPlayer from './components/VideoPlayer';
+import AdminButton from './components/AdminButton';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -206,9 +207,10 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
           <p className="text-white">{message.content}</p>
           <div className="flex justify-between items-center mt-1">
             <p className="text-[10px] text-white/50">
-              {message.sender === 'user' && message.walletAddress 
-                ? `${message.walletAddress.slice(0, 4)}...${message.walletAddress.slice(-4)}`
-                : 'Veda AI'}
+              {message.sender === 'user' 
+                ? message.walletAddress?.slice(0, 16) + '...'  // Show truncated wallet for user
+                : 'Veda'  // Always show 'Veda' for AI responses
+              }
             </p>
             <p className="text-[10px] text-white/50">
               {message.timestamp.toLocaleTimeString()}
@@ -843,24 +845,25 @@ export default function Home() {
 
   const fetchPrizePool = async () => {
     try {
-        // Create a direct connection to devnet
-        const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-        const [programWallet] = PublicKey.findProgramAddressSync(
-            [Buffer.from("program_wallet")],
-            new PublicKey(PROGRAM_ID)
-        );
-        const balance = await connection.getBalance(programWallet);
-        setPrizePool(balance / LAMPORTS_PER_SOL);
-    } catch (error) {
-        console.error("Error fetching prize pool:", error);
-        setPrizePool(0);
+      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+      const [programWallet] = PublicKey.findProgramAddressSync(
+        [Buffer.from("program_wallet")],
+        new PublicKey(PROGRAM_ID)
+      );
+      const balance = await connection.getBalance(programWallet);
+      setPrizePool(balance / LAMPORTS_PER_SOL);
+    } catch (err) {
+      const error = err as Error;
+      logger.error("Error fetching prize pool", error);
+      setPrizePool(0);
     }
-};
+  };
+
   useEffect(() => {
     fetchPrizePool();
     const interval = setInterval(fetchPrizePool, 10000); // Update every 10 seconds
     return () => clearInterval(interval);
-}, [connection]);
+  }, [connection]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -889,7 +892,6 @@ export default function Home() {
     setIsProcessing(true);
 
     try {
-      // Make both API calls in parallel
       const [counterResponse, chatResponse] = await Promise.all([
         fetch('/api/counter', { method: 'POST' }),
         fetch('/api/chat', {
@@ -905,39 +907,83 @@ export default function Home() {
       if (!chatResponse.ok) throw new Error('API request failed');
       const data = await chatResponse.json();
 
-      // Add both messages at once when we have the response
+      // Add messages to chat with proper timestamps
+      const now = new Date();
       setMessages(prev => [...prev, 
         {
-          id: Date.now(),
+          id: now.getTime(),
           content: messageText,
           sender: 'user',
-          timestamp: new Date(),
+          timestamp: now,
           walletAddress: publicKey.toString(),
         },
         {
-          id: Date.now() + 1,
+          id: now.getTime() + 1,
           content: data.reply,
           sender: 'ai',
-          timestamp: new Date(),
+          timestamp: now,
+          walletAddress: publicKey.toString(),  // Include requester's wallet address
         }
       ]);
 
-      // Handle winning condition
-      if (data.isWinner) {
+      // Check for winning condition and trigger withdrawal
+      if (data.reply.includes('YOU SEDUCED ME')) {
         setDetectedTrigger(true);
         setTransactionStatus({ 
           state: 'processing', 
-          message: 'You won the heart of Veda!' 
+          message: 'You won! Processing prize withdrawal...' 
         });
-        fireFireworks();
+        
+        try {
+          // Create provider and program interface
+          const provider = getProvider(connection, window.solana);
+          const program = new anchor.Program(IDL, new PublicKey(PROGRAM_ID), provider);
+          
+          // Get PDA
+          const [programWallet] = PublicKey.findProgramAddressSync(
+            [Buffer.from("program_wallet")],
+            new PublicKey(PROGRAM_ID)
+          );
+
+          // Call withdrawToWinner instruction
+          const tx = await program.methods
+            .withdrawToWinner()
+            .accounts({
+              winner: publicKey,
+              programWallet: programWallet,
+              systemProgram: SystemProgram.programId,
+            })
+            .rpc();
+
+          console.log("Withdrawal transaction signature:", tx);
+          setTransactionStatus({ 
+            state: 'confirmed', 
+            message: 'Prize has been sent to your wallet!' 
+          });
+          fireFireworks();
+          
+          // Refresh prize pool display
+          await fetchPrizePool();
+        } catch (err) {
+          const error = err as Error;
+          console.error('Withdrawal error:', error);
+          setTransactionStatus({ 
+            state: 'error', 
+            message: 'Failed to process withdrawal: ' + error.message 
+          });
+        }
       }
 
       // Lock the chat after successful message exchange
       setChatState('questionAsked');
 
-    } catch (error) {
-      console.error('Error:', error);
-      // Handle error state
+    } catch (err) {
+      const error = err as Error;  // Type assertion
+      logger.error('Failed to process message:', error);
+      setTransactionStatus({ 
+        state: 'error', 
+        message: 'Failed to process message' 
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -1050,33 +1096,33 @@ console.log("Provider created");
 useEffect(() => {
   const loadMessages = async () => {
     try {
-      const response = await fetch('/api/chat');
+      const response = await fetch('/api/messages');
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch messages');
+        throw new Error('Failed to fetch messages');
       }
+      const data = await response.json();
       
-      const data = await response.json() as { messages: StoredMessage[] };
-      
-      if (!data.messages) {
-        logger.warn('No messages found in response');
+      if (!data.messages || data.messages.length === 0) {
+        setMessages([]);
         return;
       }
 
-      // Convert stored messages to your Message format with explicit sender types
-      const formattedMessages = data.messages.flatMap((msg: StoredMessage, index) => [
+      // Convert API messages to client Message format
+      // Messages are already in chronological order from the database
+      const formattedMessages = data.messages.flatMap((msg: StoredMessage) => [
         {
-          id: index * 2,
+          id: Date.parse(msg.timestamp),  // Use timestamp as ID for proper ordering
           content: msg.query,
           sender: 'user' as const,
           timestamp: new Date(msg.timestamp),
           walletAddress: msg.walletAddress,
         },
         {
-          id: index * 2 + 1,
+          id: Date.parse(msg.timestamp) + 1,  // Ensure unique ID but maintain order
           content: msg.response,
           sender: 'ai' as const,
           timestamp: new Date(msg.timestamp),
+          walletAddress: msg.walletAddress,  // Include requester's wallet address
         }
       ]);
       
@@ -1084,17 +1130,30 @@ useEffect(() => {
     } catch (err) {
       const error = err as Error;
       logger.error('Error loading messages:', error);
-      // Don't return empty array here, keep existing messages
     }
   };
 
-  // Initial load
   loadMessages();
-
-  // Poll for updates every 10 seconds
-  const interval = setInterval(loadMessages, 10000);
-  return () => clearInterval(interval);
 }, []);
+
+const saveMessage = async (message: StoredMessage) => {
+  try {
+    const response = await fetch('/api/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to save message');
+    }
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Error saving message:', error);
+  }
+};
 
 const enableFreeMode = () => {
   if (!publicKey) {
@@ -1110,22 +1169,6 @@ const enableFreeMode = () => {
     message: 'Free mode enabled!' 
   });
 };
-
-// Run database setup only once when component mounts
-useEffect(() => {
-  const initDatabase = async () => {
-    try {
-      await setupDatabase();
-      const success = await testDatabaseConnection();
-      console.log('Database setup and test:', success ? 'SUCCESS' : 'FAILED');
-    } catch (err) {
-      const error = err as Error;
-      console.error('Database initialization error:', error.message);
-    }
-  };
-
-  initDatabase();
-}, []); // Empty dependency array means this runs once on mount
 
 const handleOpenModal = (modalName: string) => {
   setActiveModal(modalName);
@@ -1154,6 +1197,9 @@ return (
         `}>
           <div className="flex flex-col gap-3">
             <QueryCounter />
+            
+            {/* Add AdminButton here */}
+            <AdminButton />
             
             {/* Status Window */}
             <div className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-4">

@@ -1,29 +1,17 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { appendMessage, getRecentMessages } from '@/app/utils/messageStorage';
+import { appendMessage } from '@/lib/db';
+import { logger } from '@/app/utils/logger';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-export async function GET() {
-  try {
-    const messages = await getRecentMessages();
-    return NextResponse.json({ messages });
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch messages' },
-      { status: 500 }
-    );
-  }
-}
-
 export async function POST(request: Request) {
   try {
     const { message, walletAddress } = await request.json();
-
-    // Create thread and use your specific assistant
+    
+    // Create thread and use assistant
     const thread = await openai.beta.threads.create();
     await openai.beta.threads.messages.create(thread.id, {
       role: "user",
@@ -52,7 +40,6 @@ export async function POST(request: Request) {
       reply = lastMessage.content[0].text.value;
     }
 
-    // Save directly to database instead of making HTTP request
     await appendMessage({
       timestamp: new Date().toISOString(),
       walletAddress,
@@ -60,9 +47,7 @@ export async function POST(request: Request) {
       response: reply
     });
 
-    // Check if this is a winning response
     const isWinner = reply.toLowerCase().includes('you seduced me');
-
     return NextResponse.json({
       reply,
       isWinner,
@@ -70,7 +55,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('Chat API error:', error);
+    logger.error('Chat API error:', error as Error);
     return NextResponse.json(
       { error: 'Failed to process message' },
       { status: 500 }
