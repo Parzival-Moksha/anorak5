@@ -11,7 +11,6 @@ import { isMobileDevice } from './utils/deviceDetection';
 import TransactionMonitor from './components/TransactionMonitor';
 import { logger } from './utils/logger';
 import VideoPlayer from './components/VideoPlayer';
-import AdminButton from './components/AdminButton';
 
 const PROGRAM_ID = 'JtUmS5izUwaEUgBeBRdnN3LYzyEi9WerTxPFVLbeiXa';  // Replace with your new ID
 const LAMPORTS_TO_PAY = LAMPORTS_PER_SOL * 0.02; // 0.02 SOL in lamports
@@ -1197,9 +1196,6 @@ return (
         `}>
           <div className="flex flex-col gap-3">
             <QueryCounter />
-            
-            {/* Add AdminButton here */}
-            <AdminButton />
             
             {/* Status Window */}
             <div className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-4">
