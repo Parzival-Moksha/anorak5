@@ -33,9 +33,7 @@ const IDL = {
   ]
 };
 
-interface AdminButtonProps {}
-
-const AdminButton: React.FC<AdminButtonProps> = () => {
+const AdminButton = () => {
   const { publicKey, signMessage } = useWallet();
   const [isAdmin, setIsAdmin] = useState(false);
   const { connection } = useConnection();
